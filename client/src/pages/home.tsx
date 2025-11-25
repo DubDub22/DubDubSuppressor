@@ -277,7 +277,7 @@ export default function Home() {
             <div className="space-y-6">
               <h2 className="text-4xl font-bold">BECOME A DEALER</h2>
               <p className="text-muted-foreground text-lg leading-relaxed">
-                Interested in stocking the Dub Dub 22? We offer competitive dealer pricing and full marketing support.
+                Interested in stocking the Dub Dub 22? We offer ULTRA competitive dealer pricing and fully functional dealer samples on the house (you cover shipping).
               </p>
               <div className="space-y-4 pt-4">
                 <div className="flex items-center gap-3 text-primary">
