@@ -316,9 +316,14 @@ export default function Home() {
         <div className="container mx-auto px-6 max-w-4xl">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold mb-4">WARRANTY SERVICE</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
               We stand behind our product. Fill out the form below and we'll get you back up and running.
             </p>
+            <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg max-w-2xl mx-auto">
+              <p className="text-sm font-medium text-primary">
+                NOTE: Many dealers who are rated as manufacturers will carry replacement sleeves and extra baffles in stock.
+              </p>
+            </div>
           </div>
           
           <div className="grid md:grid-cols-2 gap-12 items-start">
