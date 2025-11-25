@@ -28,11 +28,19 @@ const IMAGES = {
   topAngled,
 };
 
-const formSchema = z.object({
+const dealerFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
   company: z.string().min(2, { message: "Company name is required." }),
   message: z.string().min(10, { message: "Message must be at least 10 characters." }),
+});
+
+const warrantyFormSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  serialNumber: z.string().min(1, { message: "Serial number is required." }),
+  description: z.string().min(10, { message: "Please describe the parts needed or missing." }),
+  missingParts: z.boolean().default(false),
 });
 
 export default function Home() {
@@ -301,6 +309,50 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Warranty Section */}
+      <section id="warranty" className="py-24 bg-secondary/10 relative border-t border-border/30">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold mb-4">WARRANTY SERVICE</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              We stand behind our product. Fill out the form below and we'll get you back up and running.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-12 items-start">
+            <div className="order-2 md:order-1">
+               <Card className="border-border bg-background/50 backdrop-blur-sm p-6 shadow-2xl">
+                 <WarrantyForm />
+               </Card>
+            </div>
+            
+            <div className="space-y-6 text-sm text-muted-foreground order-1 md:order-2">
+              <div className="bg-card border border-border p-6 rounded-lg space-y-4">
+                <h3 className="text-foreground font-bold text-lg flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-primary" /> Service Process
+                </h3>
+                <ul className="space-y-3 list-disc pl-4 marker:text-primary">
+                  <li>We typically respond within <strong>24-48 hours</strong> with mailing instructions.</li>
+                  <li>You will need to send the parts needing replacement + a return envelope/box with your address and <strong>adult signature required</strong>.</li>
+                  <li>Warranty service is <strong>free</strong>, but you supply the return label.</li>
+                </ul>
+              </div>
+
+              <div className="bg-card border border-border p-6 rounded-lg space-y-4">
+                <h3 className="text-foreground font-bold text-lg flex items-center gap-2">
+                  <ArrowDown className="w-5 h-5 text-primary" /> Important Notes
+                </h3>
+                <ul className="space-y-3 list-disc pl-4 marker:text-primary">
+                  <li><strong>Missing Baffles:</strong> Include a signed & dated handwritten note explaining why (e.g., ejected down range). Send sleeves without them.</li>
+                  <li><strong>Exclusions:</strong> We do not replace the 1/2x28 locknut or stainless steel blast baffles (source elsewhere).</li>
+                  <li><strong>Outer Tube:</strong> Keep unless damaged. If damaged, a <strong>$75 fee</strong> applies (check mailed with tube).</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-12 border-t border-border bg-card/50">
         <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
@@ -317,8 +369,8 @@ export default function Home() {
 
 function DealerForm() {
   const { toast } = useToast();
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof dealerFormSchema>>({
+    resolver: zodResolver(dealerFormSchema),
     defaultValues: {
       name: "",
       company: "",
@@ -327,7 +379,7 @@ function DealerForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: z.infer<typeof dealerFormSchema>) {
     toast({
       title: "Inquiry Sent",
       description: "Thanks for reaching out! We'll be in touch shortly.",
@@ -395,8 +447,96 @@ function DealerForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button type="submit" className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer">
           SEND INQUIRY
+        </Button>
+      </form>
+    </Form>
+  );
+}
+
+function WarrantyForm() {
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof warrantyFormSchema>>({
+    resolver: zodResolver(warrantyFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      serialNumber: "",
+      description: "",
+    },
+  });
+
+  function onSubmit(values: z.infer<typeof warrantyFormSchema>) {
+    toast({
+      title: "Warranty Request Received",
+      description: "We'll verify your details and send instructions within 24-48 hours.",
+    });
+    console.log(values);
+    form.reset();
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 text-left">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John Doe" {...field} className="bg-card border-border focus:border-primary" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="john@example.com" {...field} className="bg-card border-border focus:border-primary" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="serialNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Serial Number</FormLabel>
+              <FormControl>
+                <Input placeholder="SN-12345" {...field} className="bg-card border-border focus:border-primary" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description of Issue / Missing Parts</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="Please describe what happened and list any missing parts..." 
+                  className="min-h-[100px] bg-card border-border focus:border-primary" 
+                  {...field} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" variant="outline" className="w-full font-display text-lg border-primary text-primary hover:bg-primary hover:text-primary-foreground cursor-pointer">
+          SUBMIT WARRANTY CLAIM
         </Button>
       </form>
     </Form>
