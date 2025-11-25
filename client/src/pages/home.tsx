@@ -31,6 +31,8 @@ const IMAGES = {
 const dealerFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
+  shopPhone: z.string().min(10, { message: "Please enter a valid phone number." }),
+  cellPhone: z.string().min(10, { message: "Please enter a valid phone number." }),
   company: z.string().min(2, { message: "Company name is required." }),
   message: z.string().min(10, { message: "Message must be at least 10 characters." }),
 });
@@ -375,6 +377,8 @@ function DealerForm() {
       name: "",
       company: "",
       email: "",
+      shopPhone: "",
+      cellPhone: "",
       message: "",
     },
   });
@@ -430,6 +434,34 @@ function DealerForm() {
             </FormItem>
           )}
         />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="shopPhone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Shop Phone</FormLabel>
+                <FormControl>
+                  <Input placeholder="(555) 123-4567" {...field} className="bg-card border-border focus:border-primary" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="cellPhone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cell Phone</FormLabel>
+                <FormControl>
+                  <Input placeholder="(555) 987-6543" {...field} className="bg-card border-border focus:border-primary" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <FormField
           control={form.control}
           name="message"
