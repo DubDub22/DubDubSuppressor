@@ -1,9 +1,17 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { ArrowDown, Wind, Wrench, Weight, Crosshair } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 // Asset Imports
 import fullSide from "@assets/Screenshot 2025-11-25 at 2.00.44 AM_1764054189439.png";
@@ -19,6 +27,13 @@ const IMAGES = {
   exploded,
   topAngled,
 };
+
+const formSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  company: z.string().min(2, { message: "Company name is required." }),
+  message: z.string().min(10, { message: "Message must be at least 10 characters." }),
+});
 
 export default function Home() {
   const scrollToSection = (id: string) => {
@@ -39,8 +54,12 @@ export default function Home() {
             <button onClick={() => scrollToSection('specs')} className="hover:text-primary transition-colors">SPECS</button>
             <button onClick={() => scrollToSection('gallery')} className="hover:text-primary transition-colors">GALLERY</button>
           </div>
-          <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-display uppercase tracking-wide hidden sm:flex">
-            Contact Us
+          <Button 
+            variant="outline" 
+            className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-display uppercase tracking-wide hidden sm:flex cursor-pointer"
+            onClick={() => scrollToSection('contact')}
+          >
+            Dealer Inquiries
           </Button>
         </div>
       </nav>
@@ -59,10 +78,15 @@ export default function Home() {
                 DUB DUB <br />
                 <span className="text-outline-primary">22</span>
               </h1>
-              <p className="text-xl text-muted-foreground max-w-lg font-light leading-relaxed">
+              <p className="text-xl text-muted-foreground max-w-lg font-light leading-relaxed mb-6">
                 Fully 3D printed with PPA CF and Stainless Steel. Flow-through technology. 
                 Ready to rock on any host.
               </p>
+              
+              <div className="flex items-baseline gap-3 mb-2">
+                <span className="text-2xl font-bold text-primary">MSRP $129</span>
+                <span className="text-muted-foreground italic">(found as low as $99!)</span>
+              </div>
             </motion.div>
 
             <motion.div 
@@ -226,7 +250,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Gallery / CTA */}
+      {/* Gallery */}
       <section id="gallery" className="py-24 text-center">
         <div className="container mx-auto px-6">
           <h2 className="text-4xl font-bold mb-6">READY TO ROCK</h2>
@@ -242,11 +266,38 @@ export default function Home() {
                 <img src={IMAGES.fullSide} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="Gallery 2" />
              </div>
           </div>
+        </div>
+      </section>
 
-          <div className="inline-block p-[1px] rounded-full bg-gradient-to-r from-transparent via-primary to-transparent">
-            <Button size="lg" className="rounded-full px-12 h-16 text-xl font-display bg-background hover:bg-secondary border-none text-foreground">
-              CONTACT FOR INQUIRIES
-            </Button>
+      {/* Dealer Inquiry Section */}
+      <section id="contact" className="py-24 bg-card/30 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-20"></div>
+        <div className="container mx-auto px-6 max-w-4xl">
+          <div className="grid md:grid-cols-2 gap-12">
+            <div className="space-y-6">
+              <h2 className="text-4xl font-bold">BECOME A DEALER</h2>
+              <p className="text-muted-foreground text-lg leading-relaxed">
+                Interested in stocking the Dub Dub 22? We offer competitive dealer pricing and full marketing support.
+              </p>
+              <div className="space-y-4 pt-4">
+                <div className="flex items-center gap-3 text-primary">
+                  <div className="w-2 h-2 rounded-full bg-primary"></div>
+                  <span className="font-medium">Standard Dealer Pricing</span>
+                </div>
+                <div className="flex items-center gap-3 text-primary">
+                  <div className="w-2 h-2 rounded-full bg-primary"></div>
+                  <span className="font-medium">Volume Discounts</span>
+                </div>
+                <div className="flex items-center gap-3 text-primary">
+                  <div className="w-2 h-2 rounded-full bg-primary"></div>
+                  <span className="font-medium">Fast Shipping</span>
+                </div>
+              </div>
+            </div>
+
+            <Card className="border-border bg-background/50 backdrop-blur-sm p-6 shadow-2xl">
+               <DealerForm />
+            </Card>
           </div>
         </div>
       </section>
@@ -262,6 +313,94 @@ export default function Home() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function DealerForm() {
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      company: "",
+      email: "",
+      message: "",
+    },
+  });
+
+  function onSubmit(values: z.infer<typeof formSchema>) {
+    toast({
+      title: "Inquiry Sent",
+      description: "Thanks for reaching out! We'll be in touch shortly.",
+    });
+    console.log(values);
+    form.reset();
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 text-left">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John Doe" {...field} className="bg-card border-border focus:border-primary" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="company"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Company / FFL</FormLabel>
+              <FormControl>
+                <Input placeholder="Tactical Solutions LLC" {...field} className="bg-card border-border focus:border-primary" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="john@example.com" {...field} className="bg-card border-border focus:border-primary" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="message"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Message</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="Tell us about your shop..." 
+                  className="min-h-[100px] bg-card border-border focus:border-primary" 
+                  {...field} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90">
+          SEND INQUIRY
+        </Button>
+      </form>
+    </Form>
   );
 }
 
