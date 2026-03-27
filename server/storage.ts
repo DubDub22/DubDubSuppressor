@@ -8,6 +8,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   createSubmission(submission: InsertSubmission): Promise<Submission>;
   getSubmissions(): Promise<Submission[]>;
+  deleteSubmission(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -33,6 +34,10 @@ export class DatabaseStorage implements IStorage {
 
   async getSubmissions(): Promise<Submission[]> {
     return db.select().from(submissions).orderBy(desc(submissions.createdAt));
+  }
+
+  async deleteSubmission(id: string): Promise<void> {
+    await db.delete(submissions).where(eq(submissions.id, id));
   }
 }
 

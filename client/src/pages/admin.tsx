@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, parseISO } from "date-fns";
-import { Copy, Image as ImageIcon, Download } from "lucide-react";
+import { Copy, Image as ImageIcon, Download, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type Submission = {
     id: string;
@@ -63,6 +64,7 @@ export default function AdminPage() {
     const [search, setSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState("all");
     const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+    const [deleteTarget, setDeleteTarget] = useState<Submission | null>(null);
 
     const pinForm = useForm<z.infer<typeof pinSchema>>({
         resolver: zodResolver(pinSchema),
@@ -149,6 +151,20 @@ export default function AdminPage() {
         await fetch("/api/admin/logout", { method: "POST" });
         setAuthStatus('needs_pin');
         setSubmissions([]);
+    };
+
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        try {
+            const res = await fetch(`/api/admin/submissions/${deleteTarget.id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Delete failed");
+            setSubmissions(prev => prev.filter(s => s.id !== deleteTarget.id));
+            toast({ title: "Deleted", description: "Submission removed." });
+        } catch {
+            toast({ title: "Error", description: "Could not delete submission.", variant: "destructive" });
+        } finally {
+            setDeleteTarget(null);
+        }
     };
 
     if (authStatus === 'checking') {
@@ -283,16 +299,17 @@ export default function AdminPage() {
                                         <th className="px-6 py-3">Type</th>
                                         <th className="px-6 py-3 min-w-[200px]">Details</th>
                                         <th className="px-6 py-3">Message / Payload</th>
+                                        <th className="px-6 py-3 w-12"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {isLoading ? (
                                         <tr>
-                                            <td colSpan={4} className="text-center py-8">Loading...</td>
+                                            <td colSpan={5} className="text-center py-8">Loading...</td>
                                         </tr>
                                     ) : filteredSubmissions.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="text-center py-8 text-muted-foreground">No submissions found.</td>
+                                            <td colSpan={5} className="text-center py-8 text-muted-foreground">No submissions found.</td>
                                         </tr>
                                     ) : (
                                         filteredSubmissions.map((sub) => (
@@ -434,6 +451,16 @@ export default function AdminPage() {
                                                         </div>
                                                     )}
                                                 </td>
+                                                <td className="px-6 py-4">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-red-500 transition-colors"
+                                                        onClick={() => setDeleteTarget(sub)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -443,6 +470,28 @@ export default function AdminPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <AlertDialogContent className="bg-card border-border">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Submission?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground">
+                            This will permanently remove the submission from {deleteTarget?.contactName} ({deleteTarget?.email}). This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-secondary text-foreground hover:bg-secondary/80 border-border">
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-red-600 text-white hover:bg-red-700"
+                            onClick={handleDelete}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

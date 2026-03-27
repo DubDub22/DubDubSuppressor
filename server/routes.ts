@@ -328,6 +328,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/admin/submissions/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSubmission(id);
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("delete_submission_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_delete" });
+    }
+  });
+
   app.post("/api/dealer-request", async (req, res) => {
     try {
       const { requestType, contactName, businessName, email, phone, quantityCans, fflFileName, fflFileData, message } = req.body || {};
