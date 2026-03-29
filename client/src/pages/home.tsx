@@ -403,15 +403,26 @@ export default function Home() {
               <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-primary transition-all duration-300 group-hover:w-full"></span>
             </button>
           </div>
-          <MotionWrapButton className="hidden sm:flex">
-            <Button
-              variant="outline"
-              className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-display uppercase tracking-wide cursor-pointer"
-              onClick={() => window.location.href = '/dealers'}
-            >
-              Dealer Inquiries
-            </Button>
-          </MotionWrapButton>
+          <div className="hidden sm:flex gap-3">
+            <MotionWrapButton>
+              <Button
+                variant="outline"
+                className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-display uppercase tracking-wide cursor-pointer"
+                onClick={() => window.location.href = '/dealers'}
+              >
+                Find a Dealer
+              </Button>
+            </MotionWrapButton>
+            <MotionWrapButton>
+              <Button
+                variant="outline"
+                className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-display uppercase tracking-wide cursor-pointer"
+                onClick={() => window.location.href = '/apply'}
+              >
+                Become a Dealer
+              </Button>
+            </MotionWrapButton>
+          </div>
         </div>
       </motion.nav>
 
@@ -684,11 +695,8 @@ export default function Home() {
 
       <div className="h-16 bg-gradient-to-b from-transparent via-background/50 to-transparent pointer-events-none" />
 
-      {/* Dealer Map Section */}
-
-      {/* Dealer Inquiry Section */}
+      {/* Dealer CTA Section */}
       <motion.section
-        id="contact"
         className="py-24 bg-card/30 relative overflow-hidden"
         variants={sectionVariants}
         initial="hidden"
@@ -697,16 +705,30 @@ export default function Home() {
       >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-20"></div>
         <div className="container mx-auto px-6 max-w-4xl">
-          <div className="grid md:grid-cols-2 gap-12">
-            <motion.div variants={fadeUpItem} className="space-y-6 text-center md:text-left flex flex-col justify-center">
-              <h2 className="text-4xl font-bold drop-shadow-sm">DEALER FORM</h2>
-              <p className="text-muted-foreground text-lg leading-relaxed">
-                Interested in carrying DubDub22 suppressors? Fill out the form and we&apos;ll be in touch.
-              </p>
+          <div className="grid md:grid-cols-2 gap-8">
+            <motion.div variants={fadeUpItem}>
+              <Card className="border-border bg-background/50 backdrop-blur-md p-8 shadow-2xl hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] transition-shadow duration-500 cursor-pointer h-full"
+                onClick={() => window.location.href = '/dealers'}>
+                <h2 className="text-3xl font-bold mb-4">FIND A DEALER</h2>
+                <p className="text-muted-foreground text-lg leading-relaxed mb-6">
+                  Use our dealer locator to find a DubDub22 dealer near you.
+                </p>
+                <Button className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-lg hover:shadow-xl transition-shadow">
+                  VIEW DEALERS
+                </Button>
+              </Card>
             </motion.div>
 
             <motion.div variants={fadeUpItem}>
-              <Card className="border-border bg-background/50 backdrop-blur-md p-6 shadow-2xl hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] transition-shadow duration-500 focus-within:ring-1 focus-within:ring-black/10 focus-within:-translate-y-1">
+              <Card className="border-border bg-background/50 backdrop-blur-md p-8 shadow-2xl hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] transition-shadow duration-500 cursor-pointer h-full"
+                onClick={() => window.location.href = '/apply'}>
+                <h2 className="text-3xl font-bold mb-4">BECOME A DEALER</h2>
+                <p className="text-muted-foreground text-lg leading-relaxed mb-6">
+                  Interested in carrying DubDub22 suppressors? Fill out the form and we&apos;ll be in touch.
+                </p>
+                <Button className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-lg hover:shadow-xl transition-shadow">
+                  APPLY NOW
+                </Button>
               </Card>
             </motion.div>
           </div>
