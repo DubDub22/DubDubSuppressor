@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown, Wind, Wrench, Feather, Crosshair, UploadCloud } from "lucide-react";
-import DealerMap from "@/components/DealerMap";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,13 +28,6 @@ const IMAGES = {
   topAngled,
 };
 
-function formatPhone(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 10);
-  if (digits.length === 0) return "";
-  if (digits.length <= 3) return `(${digits}`;
-  if (digits.length <= 6) return `(${digits.slice(0, 3)})${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)})${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
 
 async function processImage(selectedFile: File | null): Promise<string | undefined> {
   if (!selectedFile) return undefined;
@@ -85,18 +77,6 @@ async function processImage(selectedFile: File | null): Promise<string | undefin
   });
 }
 
-const dealerFormSchema = z.object({
-  contactName: z.string().min(2, { message: "Contact name is required." }),
-  businessName: z.string().min(2, { message: "Business name is required." }),
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  confirmEmail: z.string().email({ message: "Please confirm your email address." }),
-  phone: z.string().min(13, { message: "Phone number is required." }),
-  quantityCans: z.string().optional(),
-  message: z.string().optional(),
-}).refine((data) => data.email === data.confirmEmail, {
-  message: "Email addresses must match.",
-  path: ["confirmEmail"],
-});
 
 const warrantyFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -237,294 +217,6 @@ function FileInputZone({ id, label, accept, capture, required, description }: an
 
 
 
-function DealerForm() {
-  const { toast } = useToast();
-  const [requestType, setRequestType] = useState<'none' | 'inquiry' | 'order'>('none');
-  const form = useForm<z.infer<typeof dealerFormSchema>>({
-    resolver: zodResolver(dealerFormSchema),
-    defaultValues: {
-      contactName: "",
-      businessName: "",
-      email: "",
-      confirmEmail: "",
-      phone: "",
-      quantityCans: "5",
-    },
-  });
-
-  async function onSubmit(values: z.infer<typeof dealerFormSchema>) {
-    // Validate based on request type
-    if (requestType === 'order' && !values.quantityCans) {
-      toast({
-        title: "Quantity Required",
-        description: "Please select the number of DubDubs for your order.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const fflInput = document.getElementById("fflUpload") as HTMLInputElement | null;
-    const selectedFile = fflInput?.files?.[0] || null;
-    const fflName = selectedFile?.name || "No file attached";
-
-    if (requestType === 'order' && !selectedFile) {
-      toast({
-        title: "FFL / SOT Required",
-        description: "Please attach your SOT file before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      let fileBase64: string | undefined;
-      if (selectedFile) {
-        fileBase64 = await processImage(selectedFile);
-      }
-
-      const resp = await fetch('/api/dealer-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...values,
-          confirmEmail: undefined,
-          requestType: requestType === 'inquiry' ? 'Dealer Inquiry' : 'Dealer Order',
-          fflFileName: fflName,
-          fflFileData: fileBase64,
-        }),
-      });
-      const data = await resp.json().catch(() => ({}));
-
-      if (!resp.ok) {
-        if (data?.error === 'demo_already_ordered') {
-          toast({
-            title: "Demo Can Already Ordered",
-            description: data.message || "Demo can limit of 1 per dealer has been fulfilled. Please place future orders in multiples of 5.",
-            variant: "destructive",
-          });
-          return;
-        }
-        if (data?.error === 'invalid_quantity') {
-          toast({
-            title: "Invalid Quantity",
-            description: data.message || "Dealer orders must be 1 (demo can) or a multiple of 5.",
-            variant: "destructive",
-          });
-          return;
-        }
-        toast({
-          title: "Request Failed",
-          description: data?.error || "Could not send request. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: requestType === 'inquiry' ? "Inquiry Sent" : "Request Sent",
-        description: requestType === 'inquiry'
-          ? "We've received your inquiry and will respond by email shortly."
-          : "Invoice request received. We'll follow up by email shortly.",
-        className: "bg-orange-500 text-black border-orange-600",
-      });
-
-      form.reset({
-        contactName: "",
-        businessName: "",
-        email: "",
-        confirmEmail: "",
-        phone: "",
-        quantityCans: "5",
-      });
-      setRequestType('none');
-      if (fflInput) fflInput.value = "";
-    } catch (err) {
-      toast({
-        title: "Send Failed",
-        description: "Could not send request. Please try again.",
-        variant: "destructive",
-      });
-    }
-  }
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 text-left">
-        {/* Step 1: Intent Selection */}
-        {requestType === 'none' && (
-          <div className="space-y-4">
-            <p className="text-sm font-medium text-muted-foreground mb-3">How can we help you today?</p>
-            <div className="space-y-2">
-              <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 cursor-pointer transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                <input
-                  type="radio"
-                  name="requestType"
-                  value="inquiry"
-                  onChange={() => setRequestType('inquiry')}
-                  className="accent-primary"
-                />
-                <span className="text-sm font-medium">I&apos;d like to make an inquiry</span>
-              </label>
-              <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 cursor-pointer transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                <input
-                  type="radio"
-                  name="requestType"
-                  value="order"
-                  onChange={() => setRequestType('order')}
-                  className="accent-primary"
-                />
-                <span className="text-sm font-medium">I&apos;d like to place an order</span>
-              </label>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Form Fields (shown after selection) */}
-        {requestType !== 'none' && (
-          <>
-            <button
-              type="button"
-              onClick={() => setRequestType('none')}
-              className="text-xs text-muted-foreground hover:text-primary transition-colors"
-            >
-              ← Change selection
-            </button>
-
-            <FormField
-              control={form.control}
-              name="contactName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contact Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} className="bg-card border-border focus:border-primary" />
-                  </FormControl>
-                  <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="businessName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Business Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Tactical Solutions LLC" {...field} className="bg-card border-border focus:border-primary" />
-                  </FormControl>
-                  <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="john@example.com" {...field} className="bg-card border-border focus:border-primary" />
-                  </FormControl>
-                  <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                </FormItem>
-              )}
-            />
-            {form.watch("email").includes("@") && (
-              <FormField
-                control={form.control}
-                name="confirmEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="john@example.com" {...field} className="bg-card border-border focus:border-primary" />
-                    </FormControl>
-                    <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                  </FormItem>
-                )}
-              />
-            )}
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number {requestType === 'inquiry' && <span className="text-xs text-muted-foreground">(optional)</span>}</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="(555)123-4567"
-                      value={field.value}
-                      onChange={(e) => field.onChange(formatPhone(e.target.value))}
-                      className="bg-card border-border focus:border-primary"
-                    />
-                  </FormControl>
-                  <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                </FormItem>
-              )}
-            />
-
-            {/* Order-only fields */}
-            {requestType === 'order' && (
-              <>
-                <FormField
-                  control={form.control}
-                  name="quantityCans"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Number of DubDubs</FormLabel>
-                      <FormControl>
-                        <select
-                          value={field.value}
-                          onChange={field.onChange}
-                          className="w-full h-10 rounded-md bg-card border border-border px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="1">1 – Demo Can</option>
-                          {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100].map((n) => (
-                            <option key={n} value={String(n)}>{n}</option>
-                          ))}
-                        </select>
-                      </FormControl>
-                      <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                    </FormItem>
-                  )}
-                />
-                <FileInputZone id="fflUpload" label="SOT Upload" accept=".pdf,.png,.jpg,.jpeg" required={true} description="Accepted: PDF, PNG, JPG/JPEG" />
-              </>
-            )}
-
-            {/* Inquiry-only field */}
-            {requestType === 'inquiry' && (
-              <FormField
-                control={form.control}
-                name="message"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Questions or Comments <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Tell us about your shop, what you're looking for, any questions you have..."
-                        rows={3}
-                        {...field}
-                        className="bg-card border-border focus:border-primary resize-none"
-                      />
-                    </FormControl>
-                    <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <MotionWrapButton className="w-full">
-              <Button type="submit" className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-lg hover:shadow-xl transition-shadow">
-                {requestType === 'inquiry' ? 'SUBMIT INQUIRY' : 'REQUEST INVOICE'}
-              </Button>
-            </MotionWrapButton>
-          </>
-        )}
-      </form>
-    </Form>
-  );
-}
 
 function WarrantyForm() {
   const { toast } = useToast();
@@ -993,7 +685,6 @@ export default function Home() {
       <div className="h-16 bg-gradient-to-b from-transparent via-background/50 to-transparent pointer-events-none" />
 
       {/* Dealer Map Section */}
-      <DealerMap />
 
       {/* Dealer Inquiry Section */}
       <motion.section
@@ -1016,7 +707,6 @@ export default function Home() {
 
             <motion.div variants={fadeUpItem}>
               <Card className="border-border bg-background/50 backdrop-blur-md p-6 shadow-2xl hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] transition-shadow duration-500 focus-within:ring-1 focus-within:ring-black/10 focus-within:-translate-y-1">
-                <DealerForm />
               </Card>
             </motion.div>
           </div>
