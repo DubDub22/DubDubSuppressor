@@ -483,6 +483,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── Dealers API ───────────────────────────────────────────────────────────
 
+  // Public: Dealer map data (no PII — name, city, state, zip, tier, verified, email, phone)
+  app.get("/api/dealers/map", async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT id, business_name, city, state, zip, tier, verified, email, phone
+        FROM dealers
+        ORDER BY
+          CASE WHEN tier = 'Preferred' THEN 0 ELSE 1 END,
+          state, city
+      `);
+      return res.json({ ok: true, data: result.rows });
+    } catch (err: any) {
+      console.error("get_dealers_map_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_fetch" });
+    }
+  });
+
   // List all dealers with order counts
   app.get("/api/admin/dealers", requireAdmin, async (req, res) => {
     try {
@@ -985,23 +1002,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error("warranty_request_error", err?.message || err);
       return res.status(500).json({ ok: false, error: err?.message || "warranty_save_failed" });
-    }
-  });
-
-  // ── Public: Dealer map data ──────────────────────────────────────────────────
-  app.get("/api/dealers/map", async (req, res) => {
-    try {
-      const result = await pool.query(`
-        SELECT id, business_name, city, state, zip, tier, verified
-        FROM dealers
-        ORDER BY
-          CASE WHEN tier = 'Preferred' THEN 0 ELSE 1 END,
-          state, city
-      `);
-      return res.json({ ok: true, data: result.rows });
-    } catch (err: any) {
-      console.error("get_dealers_map_error", err);
-      return res.status(500).json({ ok: false, error: "failed_to_fetch" });
     }
   });
 

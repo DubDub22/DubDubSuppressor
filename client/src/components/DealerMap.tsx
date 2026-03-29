@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import React, { useState, useEffect, useMemo } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, X, Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { MapPin, X, Loader2, Phone, Mail } from "lucide-react";
 
 // Custom colored marker icons for dealer tiers
-// Preferred = gold, Normal = dark/black
 const goldIcon = new L.DivIcon({
   className: "custom-marker",
   html: `<div style="
@@ -67,8 +65,6 @@ const blackIcon = new L.DivIcon({
   popupAnchor: [0, -41],
 });
 
-// Fallback to default marker if needed
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
@@ -84,9 +80,11 @@ interface Dealer {
   zip: string;
   tier: string;
   verified: boolean;
+  email?: string;
+  phone?: string;
 }
 
-// Geocode a zip code to lat/lng using a free API
+// Geocode a zip code to lat/lng using Zippopotam
 async function geocodeZip(zip: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const res = await fetch(`https://api.zippopotam.us/us/${zip}`);
@@ -101,24 +99,32 @@ async function geocodeZip(zip: string): Promise<{ lat: number; lng: number } | n
   }
 }
 
-// Approximate center of continental US
+// Haversine distance in miles
+function haversineMiles(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 3958.8;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const RADIUS_MILES = 50;
 const DEFAULT_CENTER: [number, number] = [39.5, -98.35];
 
-function FitBoundsOnLoad({ dealers }: { dealers: Dealer[] }) {
+// Zoom map to show 50-mile circle around search coords
+function ZoomToRadius({ center, radius }: { center: [number, number]; radius: number }) {
   const map = useMap();
   useEffect(() => {
-    if (dealers.length === 0) return;
-    const coords = dealers
-      .map(d => d._latlng as [number, number] | undefined)
-      .filter(Boolean) as [number, number][];
-    if (coords.length === 0) return;
-    if (coords.length === 1) {
-      map.setView(coords[0], 10);
-    } else {
-      const bounds = L.latLngBounds(coords);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
-    }
-  }, [dealers, map]);
+    // zoom level 8 gives roughly a 50-mile radius circle to fit nicely
+    map.setView(center, 8, { animate: true, duration: 0.5 });
+  }, [center, map]);
   return null;
 }
 
@@ -126,26 +132,29 @@ export default function DealerMap() {
   const { toast } = useToast();
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   // Zip search state
   const [searchZip, setSearchZip] = useState("");
   const [searchCoords, setSearchCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [searchingZip, setSearchingZip] = useState(false);
+  const [searchedZip, setSearchedZip] = useState("");
 
-  // Form state
-  const [form, setForm] = useState({ contactName: "", email: "", phone: "", message: "" });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
+  // Load all dealers once
   useEffect(() => {
     async function loadDealers() {
       try {
         const resp = await fetch("/api/dealers/map");
         const data = await resp.json();
         if (!data.ok) throw new Error("Failed to load dealers");
-        setDealers(data.data || []);
+        // Attach coordinates to each dealer
+        const withCoords = await Promise.all(
+          (data.data || []).map(async (d: Dealer) => {
+            if ((d as any)._latlng) return d;
+            const coords = await geocodeZip(d.zip);
+            return { ...d, _latlng: coords };
+          })
+        );
+        setDealers(withCoords);
       } catch {
         toast({ title: "Could not load dealer map", variant: "destructive" });
         setDealers([]);
@@ -156,54 +165,27 @@ export default function DealerMap() {
     loadDealers();
   }, [toast]);
 
-  // Geocode all dealers that don't have coordinates yet
-  useEffect(() => {
-    async function geocode() {
-      const updated = await Promise.all(
-        dealers.map(async (dealer) => {
-          if ((dealer as any)._latlng) return dealer;
-          const coords = await geocodeZip(dealer.zip);
-          return { ...dealer, _latlng: coords };
-        })
-      );
-      setDealers(updated);
-    }
-    if (dealers.length > 0 && !(dealers[0] as any)._latlng) {
-      geocode();
-    }
-  }, [dealers]);
+  // Dealers with coordinates
+  const mappableDealers = useMemo(
+    () => dealers.filter(d => (d as any)._latlng),
+    [dealers]
+  );
 
-  // Sort dealers: Preferred first, then by proximity to searched zip
-  const sortedDealers = React.useMemo(() => {
-    const withDist = dealers.map(d => {
-      const ll = (d as any)._latlng;
-      let dist = Infinity;
-      if (searchCoords && ll) {
-        // Haversine-ish approximation for miles
-        const R = 3958.8;
-        const dLat = (ll.lat - searchCoords.lat) * Math.PI / 180;
-        const dLng = (ll.lng - searchCoords.lng) * Math.PI / 180;
-        const a = Math.sin(dLat/2)**2 + Math.cos(ll.lat * Math.PI/180) * Math.cos(searchCoords.lat * Math.PI/180) * Math.sin(dLng/2)**2;
-        dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      }
-      return { ...d, _dist: dist };
-    });
+  // Dealers within 50-mile radius of searched zip (sorted by distance)
+  const nearbyDealers = useMemo(() => {
+    if (!searchCoords) return [];
+    return mappableDealers
+      .map(d => {
+        const ll = (d as any)._latlng as [number, number];
+        const dist = haversineMiles(searchCoords.lat, searchCoords.lng, ll[0], ll[1]);
+        return { ...d, _dist: dist };
+      })
+      .filter(d => d._dist <= RADIUS_MILES)
+      .sort((a, b) => a._dist - b._dist);
+  }, [mappableDealers, searchCoords]);
 
-    return withDist.sort((a, b) => {
-      // Preferred first
-      if (a.tier === "Preferred" && b.tier !== "Preferred") return -1;
-      if (a.tier !== "Preferred" && b.tier === "Preferred") return 1;
-      // Then by distance (only if zip searched)
-      if (searchCoords) {
-        return a._dist - b._dist;
-      }
-      // Default: alpha by state then city (handle nulls)
-      const aState = a.state || '';
-      const bState = b.state || '';
-      if (aState !== bState) return aState.localeCompare(bState);
-      return (a.city || '').localeCompare(b.city || '');
-    });
-  }, [dealers, searchCoords]);
+  // Show all dealers if no search; otherwise show only nearby
+  const visibleDealers = searchCoords ? nearbyDealers : mappableDealers;
 
   async function handleZipSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -219,7 +201,8 @@ export default function DealerMap() {
       setSearchCoords(null);
     } else {
       setSearchCoords(coords);
-      toast({ title: `Showing dealers near ${zip}`, duration: 2000 });
+      setSearchedZip(zip);
+      toast({ title: `Showing dealers within ${RADIUS_MILES} mi of ${zip}`, duration: 3000 });
     }
     setSearchingZip(false);
   }
@@ -227,243 +210,216 @@ export default function DealerMap() {
   function clearZipSearch() {
     setSearchZip("");
     setSearchCoords(null);
+    setSearchedZip("");
   }
 
-  function validateForm() {
-    const errors: Record<string, string> = {};
-    if (!form.contactName.trim()) errors.contactName = "Name is required";
-    if (!form.email.trim()) errors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = "Invalid email";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validateForm() || !selectedDealer) return;
-    setSubmitting(true);
-    try {
-      const resp = await fetch("/api/retail-inquiry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dealerId: selectedDealer.id,
-          contactName: form.contactName.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim() || undefined,
-          message: form.message.trim() || undefined,
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok || !data.ok) throw new Error(data.error || "Submission failed");
-
-      toast({
-        title: "Inquiry Sent!",
-        description: `We'll be in touch about ${selectedDealer.business_name} shortly.`,
-        className: "bg-orange-500 text-black border-orange-600",
-      });
-      setShowForm(false);
-      setForm({ contactName: "", email: "", phone: "", message: "" });
-      setSelectedDealer(null);
-    } catch {
-      toast({ title: "Send Failed", description: "Please try again.", variant: "destructive" });
-    } finally {
-      setSubmitting(false);
+  function formatPhone(phone?: string) {
+    if (!phone) return null;
+    const cleaned = phone.replace(/\D/g, "");
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     }
+    return phone;
   }
-
-  function openForm(dealer: Dealer) {
-    setSelectedDealer(dealer);
-    setShowForm(true);
-  }
-
-  // Filter dealers with coordinates
-  const mappableDealers = sortedDealers.filter(d => (d as any)._latlng);
 
   return (
     <>
-      {/* Dealer Map Section */}
-      <section className="py-16 bg-card/30" id="dealer-map">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-6">
-            <h2 className="text-4xl font-bold mb-3">FIND A DEALER</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto mb-4">
-              Click a pin to see dealer info and send an inquiry directly to our team.
-            </p>
-            {/* Zip search */}
-            <form onSubmit={handleZipSearch} className="flex justify-center gap-2 max-w-sm mx-auto">
-              <Input
-                type="text"
-                inputMode="numeric"
-                maxLength={5}
-                placeholder="Enter your zip"
-                value={searchZip}
-                onChange={e => setSearchZip(e.target.value.replace(/[^0-9]/g, "").slice(0,5))}
-                className="w-36 text-center bg-card border-border"
-              />
-              <Button
-                type="submit"
-                variant="default"
-                disabled={searchingZip}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 font-display cursor-pointer px-6"
-              >
-                {searchingZip ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
-              </Button>
-              {searchCoords && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={clearZipSearch}
-                  className="text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
-            </form>
+      {/* Search bar */}
+      <div className="flex justify-center mb-4 gap-2">
+        <form onSubmit={handleZipSearch} className="flex gap-2">
+          <Input
+            type="text"
+            inputMode="numeric"
+            maxLength={5}
+            placeholder="Your zip code"
+            value={searchZip}
+            onChange={e => setSearchZip(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
+            className="w-36 text-center bg-card border-border"
+          />
+          <Button
+            type="submit"
+            variant="default"
+            disabled={searchingZip}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-display cursor-pointer"
+          >
+            {searchingZip ? <Loader2 className="w-4 h-4 animate-spin" /> : "Find Dealers"}
+          </Button>
+          {searchCoords && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={clearZipSearch}
+              className="text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </form>
+      </div>
+
+      {/* Results summary */}
+      {!loading && (
+        <p className="text-center text-sm text-muted-foreground mb-3">
+          {searchCoords
+            ? `${nearbyDealers.length} dealer${nearbyDealers.length !== 1 ? "s" : ""} within ${RADIUS_MILES} miles of ${searchedZip}`
+            : `${mappableDealers.length} dealer${mappableDealers.length !== 1 ? "s" : ""} on map`}
+        </p>
+      )}
+
+      {/* Map */}
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <div className="rounded-xl overflow-hidden border border-border shadow-xl" style={{ height: "500px" }}>
+          <MapContainer
+            center={searchCoords ? [searchCoords.lat, searchCoords.lng] as [number, number] : DEFAULT_CENTER}
+            zoom={searchCoords ? 8 : 4}
+            style={{ height: "100%", width: "100%" }}
+            scrollWheelZoom={true}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            {/* 50-mile radius circle when zip searched */}
             {searchCoords && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Sorted by distance from {searchZip}
-              </p>
+              <Circle
+                center={[searchCoords.lat, searchCoords.lng]}
+                radius={RADIUS_MILES * 1609.34}
+                pathOptions={{ color: "#FF6600", fillColor: "#FF6600", fillOpacity: 0.08, weight: 2 }}
+              />
             )}
-          </div>
 
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="rounded-xl overflow-hidden border border-border shadow-xl" style={{ height: "500px" }}>
-              <MapContainer
-                center={DEFAULT_CENTER}
-                zoom={4}
-                style={{ height: "100%", width: "100%" }}
-                scrollWheelZoom={true}
+            {searchCoords && (
+              <ZoomToRadius
+                center={[searchCoords.lat, searchCoords.lng]}
+                radius={RADIUS_MILES}
+              />
+            )}
+
+            {visibleDealers.map(dealer => (
+              <Marker
+                key={dealer.id}
+                // @ts-expect-error custom property
+                position={dealer._latlng}
+                icon={dealer.tier === "Preferred" ? goldIcon : blackIcon}
               >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {mappableDealers.map(dealer => (
-                  <Marker
-                    key={dealer.id}
-                    // @ts-expect-error custom property
-                    position={dealer._latlng}
-                    icon={dealer.tier === "Preferred" ? goldIcon : blackIcon}
-                    eventHandlers={{
-                      click: () => openForm(dealer),
-                    }}
-                  >
-                    <Popup>
-                      <div className="min-w-[200px]">
-                        <p className="font-bold text-sm">{dealer.business_name}</p>
-                        <p className="text-xs text-gray-600">{dealer.city}, {dealer.state} {dealer.zip}</p>
-                        {dealer.tier && (
-                          <span className="inline-block mt-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                            {dealer.tier}
-                          </span>
-                        )}
-                        <button
-                          onClick={() => openForm(dealer)}
-                          className="mt-2 w-full bg-primary text-white text-xs font-bold py-1.5 px-3 rounded hover:bg-primary/90 transition-colors"
-                        >
-                          I'm Interested
-                        </button>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-                <FitBoundsOnLoad dealers={mappableDealers} />
-              </MapContainer>
-            </div>
-          )}
+                <Popup>
+                  <div className="min-w-[200px]">
+                    <p className="font-bold text-sm">{dealer.business_name}</p>
+                    <p className="text-xs text-gray-600">{dealer.city}, {dealer.state} {dealer.zip}</p>
+                    {dealer.tier === "Preferred" && (
+                      <span className="inline-block mt-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                        Preferred
+                      </span>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
 
-          {!loading && sortedDealers.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">
-              No dealers found.
-            </p>
-          )}
-
-          {!loading && mappableDealers.length === 0 && sortedDealers.length > 0 && (
-            <p className="text-center text-muted-foreground py-12">
-              No dealer locations available yet. Check back soon.
-            </p>
-          )}
+            {/* Fit bounds when no zip search */}
+            {!searchCoords && visibleDealers.length > 0 && (
+              <FitBoundsOnLoad dealers={visibleDealers} />
+            )}
+          </MapContainer>
         </div>
-      </section>
+      )}
 
-      {/* Inquiry Modal */}
-      {showForm && selectedDealer && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <Card className="w-full max-w-md shadow-2xl border-border">
-            <CardHeader className="relative pb-2">
-              <button
-                onClick={() => { setShowForm(false); setSelectedDealer(null); }}
-                className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+      {/* Dealer list below map */}
+      {!loading && visibleDealers.length > 0 && (
+        <div className="mt-6 space-y-3">
+          {visibleDealers.map(dealer => {
+            const phone = formatPhone(dealer.phone);
+            const hasEmail = dealer.email && dealer.email.includes("@");
+            return (
+              <Card
+                key={dealer.id}
+                className="bg-card border-border p-4 flex flex-col sm:flex-row sm:items-center gap-3"
               >
-                <X className="w-5 h-5" />
-              </button>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary" />
-                Inquiry — {selectedDealer.business_name}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {selectedDealer.city}, {selectedDealer.state}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                <div>
-                  <label className="text-sm font-medium">Your Name *</label>
-                  <Input
-                    value={form.contactName}
-                    onChange={e => setForm(f => ({ ...f, contactName: e.target.value }))}
-                    placeholder="John Smith"
-                    className="mt-1 bg-card border-border focus:border-primary"
-                  />
-                  {formErrors.contactName && <p className="text-xs text-red-500 mt-1">{formErrors.contactName}</p>}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-foreground">{dealer.business_name}</p>
+                    {dealer.tier === "Preferred" && (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">
+                        Preferred
+                      </span>
+                    )}
+                    {dealer._dist !== undefined && (
+                      <span className="text-xs text-muted-foreground">
+                        {dealer._dist.toFixed(1)} mi
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {dealer.city}, {dealer.state} {dealer.zip}
+                  </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                    {phone && (
+                      <a
+                        href={`tel:${dealer.phone}`}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        {phone}
+                      </a>
+                    )}
+                    {hasEmail && (
+                      <a
+                        href={`mailto:${dealer.email}`}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        {dealer.email}
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Email *</label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="john@example.com"
-                    className="mt-1 bg-card border-border focus:border-primary"
-                  />
-                  {formErrors.email && <p className="text-xs text-red-500 mt-1">{formErrors.email}</p>}
+                <div className="flex gap-2 shrink-0">
+                  {hasEmail && (
+                    <a
+                      href={`mailto:${dealer.email}`}
+                      className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-bold px-4 py-2 rounded transition-colors cursor-pointer"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Contact Dealer
+                    </a>
+                  )}
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Phone <span className="text-muted-foreground">(optional)</span></label>
-                  <Input
-                    value={form.phone}
-                    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                    placeholder="(555) 123-4567"
-                    className="mt-1 bg-card border-border focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Message <span className="text-muted-foreground">(optional)</span></label>
-                  <Textarea
-                    value={form.message}
-                    onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-                    placeholder="Tell us about your interest or any questions..."
-                    rows={3}
-                    className="mt-1 bg-card border-border focus:border-primary resize-none"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-display cursor-pointer"
-                >
-                  {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...</> : "SEND INQUIRY"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </Card>
+            );
+          })}
         </div>
+      )}
+
+      {!loading && visibleDealers.length === 0 && (
+        <p className="text-center text-muted-foreground py-12">
+          {searchCoords
+            ? `No dealers within ${RADIUS_MILES} miles of ${searchedZip}. Try a different zip code.`
+            : "No dealers found."}
+        </p>
       )}
     </>
   );
+}
+
+function FitBoundsOnLoad({ dealers }: { dealers: Dealer[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (dealers.length === 0) return;
+    const coords = dealers
+      .map(d => (d as any)._latlng as [number, number] | undefined)
+      .filter(Boolean) as [number, number][];
+    if (coords.length === 0) return;
+    if (coords.length === 1) {
+      map.setView(coords[0], 10);
+    } else {
+      const bounds = L.latLngBounds(coords);
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+    }
+  }, [dealers, map]);
+  return null;
 }
