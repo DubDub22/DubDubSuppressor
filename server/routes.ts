@@ -994,8 +994,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await pool.query(`
         SELECT id, business_name, city, state, zip, tier, verified
         FROM dealers
-        WHERE verified = true
-        ORDER BY state, city
+        ORDER BY
+          CASE WHEN tier = 'Preferred' THEN 0 ELSE 1 END,
+          state, city
       `);
       return res.json({ ok: true, data: result.rows });
     } catch (err: any) {

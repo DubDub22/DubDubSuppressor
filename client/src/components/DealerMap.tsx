@@ -130,6 +130,11 @@ export default function DealerMap() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Zip search state
+  const [searchZip, setSearchZip] = useState("");
+  const [searchCoords, setSearchCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [searchingZip, setSearchingZip] = useState(false);
+
   // Form state
   const [form, setForm] = useState({ contactName: "", email: "", phone: "", message: "" });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -167,6 +172,60 @@ export default function DealerMap() {
       geocode();
     }
   }, [dealers]);
+
+  // Sort dealers: Preferred first, then by proximity to searched zip
+  const sortedDealers = React.useMemo(() => {
+    const withDist = dealers.map(d => {
+      const ll = (d as any)._latlng;
+      let dist = Infinity;
+      if (searchCoords && ll) {
+        // Haversine-ish approximation for miles
+        const R = 3958.8;
+        const dLat = (ll.lat - searchCoords.lat) * Math.PI / 180;
+        const dLng = (ll.lng - searchCoords.lng) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(ll.lat * Math.PI/180) * Math.cos(searchCoords.lat * Math.PI/180) * Math.sin(dLng/2)**2;
+        dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      }
+      return { ...d, _dist: dist };
+    });
+
+    return withDist.sort((a, b) => {
+      // Preferred first
+      if (a.tier === "Preferred" && b.tier !== "Preferred") return -1;
+      if (a.tier !== "Preferred" && b.tier === "Preferred") return 1;
+      // Then by distance (only if zip searched)
+      if (searchCoords) {
+        return a._dist - b._dist;
+      }
+      // Default: alpha by state then city
+      if (a.state !== b.state) return a.state.localeCompare(b.state);
+      return a.city.localeCompare(b.city);
+    });
+  }, [dealers, searchCoords]);
+
+  async function handleZipSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const zip = searchZip.trim().replace(/[^0-9]/g, "");
+    if (zip.length !== 5) {
+      toast({ title: "Enter a valid 5-digit zip code", variant: "destructive" });
+      return;
+    }
+    setSearchingZip(true);
+    const coords = await geocodeZip(zip);
+    if (!coords) {
+      toast({ title: "Could not find that zip code", variant: "destructive" });
+      setSearchCoords(null);
+    } else {
+      setSearchCoords(coords);
+      toast({ title: `Showing dealers near ${zip}`, duration: 2000 });
+    }
+    setSearchingZip(false);
+  }
+
+  function clearZipSearch() {
+    setSearchZip("");
+    setSearchCoords(null);
+  }
 
   function validateForm() {
     const errors: Record<string, string> = {};
@@ -217,18 +276,53 @@ export default function DealerMap() {
   }
 
   // Filter dealers with coordinates
-  const mappableDealers = dealers.filter(d => (d as any)._latlng);
+  const mappableDealers = sortedDealers.filter(d => (d as any)._latlng);
 
   return (
     <>
       {/* Dealer Map Section */}
       <section className="py-16 bg-card/30" id="dealer-map">
         <div className="container mx-auto px-6">
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <h2 className="text-4xl font-bold mb-3">FIND A DEALER</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
+            <p className="text-muted-foreground max-w-xl mx-auto mb-4">
               Click a pin to see dealer info and send an inquiry directly to our team.
             </p>
+            {/* Zip search */}
+            <form onSubmit={handleZipSearch} className="flex justify-center gap-2 max-w-sm mx-auto">
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={5}
+                placeholder="Enter your zip"
+                value={searchZip}
+                onChange={e => setSearchZip(e.target.value.replace(/[^0-9]/g, "").slice(0,5))}
+                className="w-36 text-center bg-card border-border"
+              />
+              <Button
+                type="submit"
+                variant="default"
+                disabled={searchingZip}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-display cursor-pointer px-6"
+              >
+                {searchingZip ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+              </Button>
+              {searchCoords && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={clearZipSearch}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </form>
+            {searchCoords && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Sorted by distance from {searchZip}
+              </p>
+            )}
           </div>
 
           {loading ? (
@@ -281,7 +375,13 @@ export default function DealerMap() {
             </div>
           )}
 
-          {!loading && mappableDealers.length === 0 && (
+          {!loading && sortedDealers.length === 0 && (
+            <p className="text-center text-muted-foreground py-12">
+              No dealers found.
+            </p>
+          )}
+
+          {!loading && mappableDealers.length === 0 && sortedDealers.length > 0 && (
             <p className="text-center text-muted-foreground py-12">
               No dealer locations available yet. Check back soon.
             </p>
