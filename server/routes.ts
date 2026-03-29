@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import fs from "fs";
+import { execSync } from "child_process";
+import { globSync } from "glob";
+import path from "path";
 import session from "express-session";
 import { storage } from "./storage";
 import { pool } from "./db";
@@ -354,6 +357,344 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error("ship_submission_error", err);
       return res.status(500).json({ ok: false, error: "failed_to_update" });
+    }
+  });
+
+  // ── Dealers API ───────────────────────────────────────────────────────────
+
+  // List all dealers with order counts
+  app.get("/api/admin/dealers", requireAdmin, async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT
+          d.*,
+          COUNT(ds.id) AS order_count,
+          COUNT(*) FILTER (WHERE ds.order_type = 'demo_order') AS demo_count,
+          COUNT(*) FILTER (WHERE ds.order_type = 'retail_order') AS retail_count
+        FROM dealers d
+        LEFT JOIN dealer_submissions ds ON ds.dealer_id = d.id
+        GROUP BY d.id
+        ORDER BY d.created_at DESC
+      `);
+      return res.json({ ok: true, data: result.rows });
+    } catch (err: any) {
+      console.error("get_dealers_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_fetch_dealers" });
+    }
+  });
+
+  // Get single dealer with full submission history
+  app.get("/api/admin/dealers/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [dealer] = await pool.query(`SELECT * FROM dealers WHERE id = $1`, [id]);
+      if (!dealer) return res.status(404).json({ ok: false, error: "dealer_not_found" });
+
+      const subs = await pool.query(`
+        SELECT s.*, ds.order_type, ds.quantity
+        FROM dealer_submissions ds
+        JOIN submissions s ON s.id = ds.submission_id
+        WHERE ds.dealer_id = $1
+        ORDER BY s.created_at DESC
+      `, [id]);
+
+      return res.json({ ok: true, data: { ...dealer, submissions: subs.rows } });
+    } catch (err: any) {
+      console.error("get_dealer_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_fetch_dealer" });
+    }
+  });
+
+  // Create a new dealer
+  app.post("/api/admin/dealers", requireAdmin, async (req, res) => {
+    try {
+      const {
+        businessName, ein, businessAddress, city, state, zip,
+        contactName, email, phone,
+        sotLicenseType, sotTaxYear, sotPeriodStart, sotPeriodEnd,
+        sotControlNumber, sotReceiptDate,
+        fflLicenseNumber, fflLicenseType, fflExpiry,
+        taxExempt, taxExemptNotes, salesTaxId, notes
+      } = req.body || {};
+
+      if (!businessName || !email) {
+        return res.status(400).json({ ok: false, error: "business_name_and_email_required" });
+      }
+
+      const result = await pool.query(`
+        INSERT INTO dealers (
+          business_name, ein, business_address, city, state, zip,
+          contact_name, email, phone,
+          sot_license_type, sot_tax_year, sot_period_start, sot_period_end,
+          sot_control_number, sot_receipt_date,
+          ffl_license_number, ffl_license_type, ffl_expiry,
+          tax_exempt, tax_exempt_notes, sales_tax_id, notes
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        RETURNING *
+      `, [
+        businessName, ein, businessAddress, city, state, zip,
+        contactName, email, phone,
+        sotLicenseType, sotTaxYear, sotPeriodStart, sotPeriodEnd,
+        sotControlNumber, sotReceiptDate,
+        fflLicenseNumber, fflLicenseType, fflExpiry,
+        taxExempt || false, taxExemptNotes, salesTaxId, notes
+      ]);
+
+      return res.json({ ok: true, data: result.rows[0] });
+    } catch (err: any) {
+      console.error("create_dealer_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_create_dealer" });
+    }
+  });
+
+  // Update a dealer
+  app.patch("/api/admin/dealers/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const allowed = [
+        "businessName","ein","businessAddress","city","state","zip",
+        "contactName","email","phone",
+        "sotLicenseType","sotTaxYear","sotPeriodStart","sotPeriodEnd",
+        "sotControlNumber","sotReceiptDate",
+        "sotFileName","sotFileData",
+        "fflLicenseNumber","fflLicenseType","fflExpiry",
+        "fflFileName","fflFileData",
+        "taxExempt","taxExemptNotes","salesTaxId",
+        "salesTaxFormData","salesTaxFormName",
+        "notes"
+      ];
+      const updates: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      for (const key of allowed) {
+        const snake = key.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
+        if (req.body[key] !== undefined) {
+          updates.push(`${snake} = $${idx}`);
+          values.push(req.body[key]);
+          idx++;
+        }
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({ ok: false, error: "no_fields_to_update" });
+      }
+      updates.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(id);
+
+      const result = await pool.query(
+        `UPDATE dealers SET ${updates.join(", ")} WHERE id = $${idx} RETURNING *`,
+        values
+      );
+      if (result.rows.length === 0) return res.status(404).json({ ok: false, error: "dealer_not_found" });
+      return res.json({ ok: true, data: result.rows[0] });
+    } catch (err: any) {
+      console.error("update_dealer_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_update_dealer" });
+    }
+  });
+
+  // Delete a dealer
+  app.delete("/api/admin/dealers/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await pool.query(`DELETE FROM dealers WHERE id = $1`, [id]);
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("delete_dealer_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_delete_dealer" });
+    }
+  });
+
+  // Parse SOT file — extract text from PDF/image and return structured data
+  app.post("/api/admin/dealers/parse-sot", requireAdmin, async (req, res) => {
+    try {
+      const { sotFileData, sotFileName } = req.body || {};
+      if (!sotFileData) return res.status(400).json({ ok: false, error: "no_file_data" });
+
+      // Decode base64 to temp file
+      const buf = Buffer.from(sotFileData, "base64");
+      const ext = (sotFileName || "").split(".").pop()?.toLowerCase() || "bin";
+      const tmpPath = `/tmp/sot_parse_${Date.now()}.${ext}`;
+      const imgPath = `/tmp/sot_parse_${Date.now()}.png`;
+      fs.writeFileSync(tmpPath, buf);
+
+      let text = "";
+
+      if (ext === "pdf") {
+        // Convert PDF page to image then OCR
+        try {
+          execSync(`pdftoppm -r 150 -png "${tmpPath}" /tmp/sot_parse_page`, { stdio: "ignore" });
+          const pageImg = glob.sync("/tmp/sot_parse_page-*.png")[0];
+          if (pageImg) {
+            execSync(`tesseract "${pageImg}" stdout -l eng --psm 6 2>/dev/null > /tmp/sot_ocr.txt`);
+            text = fs.readFileSync("/tmp/sot_ocr.txt", "utf8");
+          }
+        } catch (e) {
+          text = "[OCR failed - could not extract text from PDF]";
+        }
+      } else {
+        // Image file — direct OCR
+        try {
+          execSync(`tesseract "${tmpPath}" stdout -l eng --psm 6 2>/dev/null > /tmp/sot_ocr.txt`);
+          text = fs.readFileSync("/tmp/sot_ocr.txt", "utf8");
+        } catch (e) {
+          text = "[OCR failed]";
+        }
+      }
+
+      // Clean up
+      try { fs.unlinkSync(tmpPath); } catch {}
+      try { fs.unlinkSync(imgPath); } catch {}
+      try { fs.unlinkSync("/tmp/sot_ocr.txt"); } catch {}
+
+      // Parse structured fields from OCR text
+      const parsed: Record<string, string> = {};
+
+      // EIN — look for pattern XX-XXXXXXX
+      const einMatch = text.match(/(\d{2}-\d{7})/);
+      if (einMatch) parsed.ein = einMatch[1];
+
+      // Business name — "DOUBLE T TACTICAL" or similar
+      const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
+      // Usually on first few lines after "Name and Principal Business Address"
+      const nameBlockIdx = lines.findIndex((l: string) =>
+        l.includes("Name and Principal") || l.includes("Business Address") || l.includes("DOUBLE T") || l.includes("TACTICAL")
+      );
+      if (nameBlockIdx >= 0) {
+        const relevant = lines.slice(nameBlockIdx, nameBlockIdx + 6);
+        // Look for company name in CAPS
+        const companyLine = relevant.find((l: string) =>
+          /^[A-Z][A-Z\s&\-']+$/.test(l) && l.length > 2 && !l.includes("Address") && !l.includes("Name")
+        );
+        if (companyLine) parsed.businessName = companyLine;
+
+        // Look for city/state/zip
+        const addrLine = relevant.find((l: string) => /TX|Texas/.test(l));
+        if (addrLine) {
+          parsed.businessAddress = addrLine.replace(/\s+TX\s+\d{5}.*$/, "").trim();
+          const zipMatch = addrLine.match(/\d{5}/);
+          if (zipMatch) parsed.zip = zipMatch[0];
+          parsed.state = "TX";
+        }
+      }
+
+      // License type — e.g. "(72) NFA FIREARMS MFGR (REDUCED)"
+      const typeMatch = text.match(/\((\d+)\)\s*([^\n]+(?:NFA[^\n]+)?)/i);
+      if (typeMatch) parsed.sotLicenseType = typeMatch[2].trim();
+
+      // Tax year — "Tax Year: 2026"
+      const yearMatch = text.match(/Tax Year[:\s]+(\d{4})/i);
+      if (yearMatch) parsed.sotTaxYear = yearMatch[1];
+
+      // Tax period — "07/01/2025 to 06/30/2026"
+      const periodMatch = text.match(/(\d{2}\/\d{2}\/\d{4})\s+to\s+(\d{2}\/\d{2}\/\d{4})/);
+      if (periodMatch) {
+        parsed.sotPeriodStart = periodMatch[1];
+        parsed.sotPeriodEnd = periodMatch[2];
+      }
+
+      // Receipt date — "July 03, 2025"
+      const dateMatch = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}/i);
+      if (dateMatch) parsed.sotReceiptDate = dateMatch[0];
+
+      // Control number — "2025160-N75-129"
+      const ctrlMatch = text.match(/(\d{7,}[A-Z0-9\-]+)/);
+      if (ctrlMatch) parsed.sotControlNumber = ctrlMatch[1];
+
+      return res.json({ ok: true, data: { parsed, rawText: text.slice(0, 500) } });
+    } catch (err: any) {
+      console.error("parse_sot_error", err);
+      return res.status(500).json({ ok: false, error: "parse_failed" });
+    }
+  });
+
+  // Upload / update SOT file for a dealer
+  app.post("/api/admin/dealers/:id/sot-file", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { sotFileName, sotFileData } = req.body || {};
+      if (!sotFileData) return res.status(400).json({ ok: false, error: "no_file" });
+
+      await pool.query(
+        `UPDATE dealers SET sot_file_name = $1, sot_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [sotFileName || "sot-file", sotFileData, id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("upload_sot_error", err);
+      return res.status(500).json({ ok: false, error: "upload_failed" });
+    }
+  });
+
+  // Upload / update FFL file for a dealer
+  app.post("/api/admin/dealers/:id/ffl-file", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fflFileName, fflFileData } = req.body || {};
+      if (!fflFileData) return res.status(400).json({ ok: false, error: "no_file" });
+
+      await pool.query(
+        `UPDATE dealers SET ffl_file_name = $1, ffl_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [fflFileName || "ffl-file", fflFileData, id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("upload_ffl_error", err);
+      return res.status(500).json({ ok: false, error: "upload_failed" });
+    }
+  });
+
+  // Upload sales tax exemption form for a dealer
+  app.post("/api/admin/dealers/:id/sales-tax-form", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { salesTaxFormName, salesTaxFormData } = req.body || {};
+      await pool.query(
+        `UPDATE dealers SET sales_tax_form_name = $1, sales_tax_form_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [salesTaxFormName || null, salesTaxFormData || null, id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("upload_tax_form_error", err);
+      return res.status(500).json({ ok: false, error: "upload_failed" });
+    }
+  });
+
+  // Link existing unlinked dealer submissions
+  app.post("/api/admin/dealers/link-submissions", requireAdmin, async (req, res) => {
+    try {
+      // Find all dealer submissions that have no dealer_id (unlinked)
+      const unlinked = await pool.query(`
+        SELECT s.id, s.business_name, s.email, s.quantity, s.has_ordered_demo, s.created_at
+        FROM submissions s
+        LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
+        WHERE s.type = 'dealer' AND ds.id IS NULL
+        ORDER BY s.created_at DESC
+      `);
+
+      let linked = 0;
+      for (const sub of unlinked.rows) {
+        // Find matching dealer by business name
+        const dealer = await pool.query(
+          `SELECT id FROM dealers WHERE business_name ILIKE $1 LIMIT 1`,
+          [sub.business_name]
+        );
+        if (dealer.rows.length > 0) {
+          const isDemo = sub.quantity === "1";
+          const orderType = isDemo ? "demo_order" : (sub.quantity ? "retail_order" : "inquiry");
+          await pool.query(
+            `INSERT INTO dealer_submissions (dealer_id, submission_id, order_type, quantity) VALUES ($1,$2,$3,$4)`,
+            [dealer.rows[0].id, sub.id, orderType, sub.quantity]
+          );
+          linked++;
+        }
+      }
+
+      return res.json({ ok: true, data: { unlinked: unlinked.rows.length, linked } });
+    } catch (err: any) {
+      console.error("link_submissions_error", err);
+      return res.status(500).json({ ok: false, error: "link_failed" });
     }
   });
 

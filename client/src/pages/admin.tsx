@@ -3,7 +3,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, parseISO } from "date-fns";
-import { Copy, Image as ImageIcon, Download, Trash2, Package } from "lucide-react";
+import {
+  Copy, Image as ImageIcon, Download, Trash2, Package,
+  ChevronRight, ArrowLeft, Building2, FileText,
+  Upload, Eye, X, Search, Users, Inbox
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,717 +15,1657 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 type Submission = {
-    id: string;
-    type: string;
-    contactName: string;
-    businessName: string;
-    email: string;
-    phone: string;
-    serialNumber: string;
-    quantity: string;
-    description: string;
-    fflFileName: string;
-    fflFileData?: string;
-    serialPhotoName?: string;
-    serialPhotoData?: string;
-    damagePhoto1Name?: string;
-    damagePhoto1Data?: string;
-    damagePhoto2Name?: string;
-    damagePhoto2Data?: string;
-    atfFormName?: string;
-    atfFormData?: string;
-    trackingNumber?: string;
-    shippedAt?: string;
-    createdAt: string;
+  id: string;
+  type: string;
+  contactName: string;
+  businessName: string;
+  email: string;
+  phone: string;
+  serialNumber: string;
+  quantity: string;
+  description: string;
+  fflFileName: string;
+  fflFileData?: string;
+  serialPhotoName?: string;
+  serialPhotoData?: string;
+  damagePhoto1Name?: string;
+  damagePhoto1Data?: string;
+  damagePhoto2Name?: string;
+  damagePhoto2Data?: string;
+  atfFormName?: string;
+  atfFormData?: string;
+  trackingNumber?: string;
+  shippedAt?: string;
+  hasOrderedDemo?: string;
+  createdAt: string;
+  order_type?: string;
 };
 
-const pinSchema = z.object({
-    pin: z.string().length(6, "PIN must be 6 digits"),
+type Dealer = {
+  id: string;
+  businessName: string;
+  ein?: string;
+  businessAddress?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  sotLicenseType?: string;
+  sotTaxYear?: string;
+  sotPeriodStart?: string;
+  sotPeriodEnd?: string;
+  sotControlNumber?: string;
+  sotReceiptDate?: string;
+  sotFileName?: string;
+  sotFileData?: string;
+  fflLicenseNumber?: string;
+  fflLicenseType?: string;
+  fflExpiry?: string;
+  fflFileName?: string;
+  fflFileData?: string;
+  taxExempt?: boolean;
+  taxExemptNotes?: string;
+  salesTaxId?: string;
+  salesTaxFormData?: string;
+  salesTaxFormName?: string;
+  notes?: string;
+  sourceSubmissionId?: string;
+  createdAt: string;
+  updatedAt: string;
+  orderCount?: number;
+  demoCount?: number;
+  retailCount?: number;
+  submissions?: Submission[];
+};
+
+type Tab = "submissions" | "dealers";
+
+// ── Schemas ────────────────────────────────────────────────────────────────────
+
+const pinSchema = z.object({ pin: z.string().length(6, "PIN must be 6 digits") });
+
+const dealerFormSchema = z.object({
+  businessName: z.string().min(1, "Required"),
+  contactName: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().optional(),
+  ein: z.string().optional(),
+  businessAddress: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  sotLicenseType: z.string().optional(),
+  sotTaxYear: z.string().optional(),
+  sotPeriodStart: z.string().optional(),
+  sotPeriodEnd: z.string().optional(),
+  sotControlNumber: z.string().optional(),
+  sotReceiptDate: z.string().optional(),
+  fflLicenseNumber: z.string().optional(),
+  fflLicenseType: z.string().optional(),
+  fflExpiry: z.string().optional(),
+  taxExempt: z.boolean().optional(),
+  taxExemptNotes: z.string().optional(),
+  salesTaxId: z.string().optional(),
+  notes: z.string().optional(),
 });
+type DealerFormValues = z.infer<typeof dealerFormSchema>;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function CopyableText({ text }: { text: string }) {
-    const { toast } = useToast();
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(text);
-        toast({ title: "Copied!", description: `Copied to clipboard.`, duration: 2000 });
-    };
-
-    return (
-        <div className="group flex items-center gap-2 cursor-pointer" onClick={handleCopy} title="Click to copy">
-            <span>{text}</span>
-            <Copy className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
-        </div>
-    );
+  const { toast } = useToast();
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied!", description: "Copied to clipboard.", duration: 2000 });
+  };
+  return (
+    <div className="group flex items-center gap-1.5 cursor-pointer" onClick={handleCopy} title="Click to copy">
+      <span className="text-sm">{text}</span>
+      <Copy className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary shrink-0" />
+    </div>
+  );
 }
 
-export default function AdminPage() {
-    const { toast } = useToast();
-    const [authStatus, setAuthStatus] = useState<'checking' | 'needs_pin' | 'pin_sent' | 'authorized'>('checking');
-    const [submissions, setSubmissions] = useState<Submission[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [expiresAt, setExpiresAt] = useState<string | null>(null);
+function FilePreview({ fileName, fileData, label = "View" }: { fileName?: string; fileData?: string; label?: string }) {
+  if (!fileData || !fileName) return null;
+  const isPdf = fileName.toLowerCase().endsWith(".pdf");
+  const src = isPdf
+    ? `data:application/pdf;base64,${fileData}`
+    : `data:image;base64,${fileData}`;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+          <Eye className="w-3 h-3" /> {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 p-1 border-border bg-card max-h-[500px] overflow-auto">
+        {isPdf ? (
+          <iframe src={src} className="w-full rounded-sm" style={{ height: "480px" }} title={fileName} />
+        ) : (
+          <img src={src} alt={fileName} className="w-full h-auto rounded-sm" />
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
-    const [search, setSearch] = useState("");
-    const [typeFilter, setTypeFilter] = useState("all");
-    const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
-    const [deleteTarget, setDeleteTarget] = useState<Submission | null>(null);
-    const [shipTarget, setShipTarget] = useState<Submission | null>(null);
-    const [shipTracking, setShipTracking] = useState("");
-    const [shipAtfFile, setShipAtfFile] = useState<File | null>(null);
-    const [shipAtfPreview, setShipAtfPreview] = useState<string | null>(null);
-    const [isShipping, setIsShipping] = useState(false);
+function FileDownload({ fileName, fileData }: { fileName?: string; fileData?: string }) {
+  if (!fileData || !fileName) return null;
+  return (
+    <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+      <a href={`data:application/octet-stream;base64,${fileData}`} download={fileName} title="Download">
+        <Download className="w-3.5 h-3.5" />
+      </a>
+    </Button>
+  );
+}
 
-    const pinForm = useForm<z.infer<typeof pinSchema>>({
-        resolver: zodResolver(pinSchema),
-        defaultValues: { pin: "" },
-    });
+function SotBadge({ dealer }: { dealer: Dealer }) {
+  const now = new Date();
+  const end = dealer.sotPeriodEnd ? parseISO(`20${dealer.sotPeriodEnd}`) : null;
+  const expired = end && end < now;
+  const soon = end && !expired && (end.getTime() - now.getTime()) < 90 * 24 * 60 * 60 * 1000;
+  if (expired) return <Badge variant="destructive" className="text-xs">SOT Expired</Badge>;
+  if (soon) return <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-600">SOT Expiring Soon</Badge>;
+  if (dealer.sotLicenseType) return <Badge variant="default" className="text-xs bg-green-600">SOT Active</Badge>;
+  return <Badge variant="secondary" className="text-xs">No SOT</Badge>;
+}
 
-    const fetchSubmissions = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            const res = await fetch("/api/admin/submissions");
-            if (res.status === 403) {
-                setAuthStatus('needs_pin');
-                setIsLoading(false);
-                return;
-            }
-            if (!res.ok) throw new Error("Failed to fetch");
-            const data = await res.json();
-            setSubmissions(data.data || []);
-            setAuthStatus('authorized');
-        } catch (err: any) {
-            toast({ title: "Error", description: err.message, variant: "destructive" });
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+function TaxBadge({ dealer }: { dealer: Dealer }) {
+  if (dealer.taxExempt) return <Badge variant="default" className="text-xs bg-blue-600">Tax Exempt</Badge>;
+  return null;
+}
 
-    useEffect(() => {
-        let cancelled = false;
-        // Check if IP is already whitelisted on mount
-        fetch("/api/admin/check-auth")
-            .then(res => res.json())
-            .then(data => {
-                if (cancelled) return;
-                if (data.authorized) {
-                    setExpiresAt(data.expiresAt || null);
-                    fetchSubmissions();
-                } else {
-                    setAuthStatus('needs_pin');
-                }
-            })
-            .catch(() => {
-                if (!cancelled) setAuthStatus('needs_pin');
-            });
-        return () => { cancelled = true; };
-    }, [fetchSubmissions]);
+function fmtDate(d: string) {
+  try { return format(parseISO(d), "yyyy-MM-dd HH:mm"); } catch { return d; }
+}
 
-    const onRequestPin = async () => {
-        try {
-            const res = await fetch("/api/admin/request-pin", { method: "POST" });
-            const data = await res.json();
-            if (!res.ok) {
-                toast({ title: "Request Failed", description: data.error || "Could not request PIN", variant: "destructive" });
-                return;
-            }
-            toast({ title: "PIN Sent", description: "Check the #general channel on Discord for your PIN." });
-            setAuthStatus('pin_sent');
-        } catch {
-            toast({ title: "Error", description: "Network error", variant: "destructive" });
-        }
-    };
+// ── Submissions Tab ───────────────────────────────────────────────────────────
 
-    const onVerifyPin = async (values: z.infer<typeof pinSchema>) => {
-        try {
-            const res = await fetch("/api/admin/verify-pin", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pin: values.pin }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                toast({ title: "Invalid PIN", description: data.error || "The PIN was invalid or expired.", variant: "destructive" });
-                pinForm.reset();
-                return;
-            }
-            setExpiresAt(data.expiresAt || null);
-            setAuthStatus('authorized');
-            fetchSubmissions();
-        } catch {
-            toast({ title: "Error", description: "Network error", variant: "destructive" });
-        }
-    };
+function SubmissionsTab({
+  submissions, isLoading, search, setSearch, typeFilter, setTypeFilter,
+  sortDir, setSortDir, setDeleteTarget, setShipTarget, onFetchSubmissions
+}: {
+  submissions: Submission[]; isLoading: boolean;
+  search: string; setSearch: (s: string) => void;
+  typeFilter: string; setTypeFilter: (s: string) => void;
+  sortDir: "desc" | "asc"; setSortDir: (d: "desc" | "asc") => void;
+  setDeleteTarget: (s: Submission | null) => void;
+  setShipTarget: (s: Submission | null) => void;
+  onFetchSubmissions: () => void;
+}) {
+  const filtered = submissions.filter((sub) => {
+    if (typeFilter !== "all" && sub.type !== typeFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const s = `${fmtDate(sub.createdAt)} ${sub.contactName} ${sub.businessName} ${sub.email} ${sub.phone} ${sub.serialNumber} ${sub.description || ""}`.toLowerCase();
+      if (!s.includes(q)) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const t = sortDir === "desc" ? -1 : 1;
+    return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * t;
+  });
 
-    const onLogout = async () => {
-        await fetch("/api/admin/logout", { method: "POST" });
-        setAuthStatus('needs_pin');
-        setSubmissions([]);
-    };
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input
+          placeholder="Search submissions..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="sm:max-w-xs bg-background h-9"
+        />
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="h-9 rounded-md bg-background border border-border px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="all">All Types</option>
+          <option value="dealer">Dealer</option>
+          <option value="warranty">Warranty</option>
+        </select>
+        <Button variant="outline" size="sm" onClick={() => setSortDir(d => d === "desc" ? "asc" : "desc")}
+          className="h-9 bg-background text-xs whitespace-nowrap">
+          {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onFetchSubmissions} className="h-9 text-xs">
+          Refresh
+        </Button>
+      </div>
 
-    const handleDelete = async () => {
-        if (!deleteTarget) return;
-        try {
-            const res = await fetch(`/api/admin/submissions/${deleteTarget.id}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Delete failed");
-            setSubmissions(prev => prev.filter(s => s.id !== deleteTarget.id));
-            toast({ title: "Deleted", description: "Submission removed." });
-        } catch {
-            toast({ title: "Error", description: "Could not delete submission.", variant: "destructive" });
-        } finally {
-            setDeleteTarget(null);
-        }
-    };
+      {/* Mobile cards */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? <p className="text-center py-8 text-muted-foreground">Loading...</p>
+          : filtered.length === 0 ? <p className="text-center py-8 text-muted-foreground">No submissions.</p>
+          : filtered.map(sub => <SubmissionCard key={sub.id} sub={sub}
+            onDelete={() => setDeleteTarget(sub)}
+            onShip={() => setShipTarget(sub)} />)}
+      </div>
 
-    const handleAtfFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-xs text-muted-foreground uppercase bg-secondary/30">
+            <tr>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Type</th>
+              <th className="px-3 py-2 min-w-[180px]">Contact</th>
+              <th className="px-3 py-2">Details</th>
+              <th className="px-3 py-2">Shipping</th>
+              <th className="px-3 py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? <tr><td colSpan={6} className="text-center py-8">Loading...</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No submissions found.</td></tr>
+              : filtered.map(sub => <SubmissionRow key={sub.id} sub={sub}
+                onDelete={() => setDeleteTarget(sub)}
+                onShip={() => setShipTarget(sub)} />)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SubmissionCard({ sub, onDelete, onShip }: { sub: Submission; onDelete: () => void; onShip: () => void }) {
+  return (
+    <div className="border border-border rounded-lg p-3 bg-card hover:bg-secondary/5">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`px-2 py-0.5 rounded text-xs font-bold ${sub.type === "dealer" ? "bg-orange-500 text-white" : "bg-red-500 text-white"}`}>
+            {sub.type.toUpperCase()}
+          </span>
+          <span className="text-xs text-muted-foreground font-mono">{fmtDate(sub.createdAt)}</span>
+        </div>
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-red-500" onClick={onDelete}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="space-y-1 mb-2">
+        <p className="text-sm font-semibold">{sub.contactName}</p>
+        <p className="text-xs text-muted-foreground">{sub.email}</p>
+        {sub.phone && <p className="text-xs text-muted-foreground">{sub.phone}</p>}
+        {sub.businessName && <p className="text-xs px-1.5 py-0.5 bg-secondary rounded inline-block">{sub.businessName}</p>}
+      </div>
+      <div className="border-t border-border pt-2 space-y-1">
+        {sub.type === "dealer" ? (
+          <>
+            {sub.quantity && <p className="text-xs text-muted-foreground">Qty: <span className="text-foreground font-medium">{sub.quantity}</span></p>}
+            {sub.description && <p className="text-xs text-foreground italic">"{sub.description}"</p>}
+            {sub.fflFileName && (
+              <div className="flex gap-2 items-center mt-1">
+                <p className="text-xs text-muted-foreground">{sub.fflFileName}</p>
+                {sub.fflFileData && <FilePreview fileName={sub.fflFileName} fileData={sub.fflFileData} />}
+                {sub.fflFileData && <FileDownload fileName={sub.fflFileName} fileData={sub.fflFileData} />}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">Serial: <span className="font-mono text-foreground">{sub.serialNumber}</span></p>
+            <p className="text-xs text-foreground">{sub.description}</p>
+          </>
+        )}
+      </div>
+      <div className="border-t border-border pt-2 mt-2">
+        {sub.trackingNumber ? (
+          <div className="space-y-1">
+            <span className="px-1.5 py-0.5 bg-green-600 text-white text-xs rounded font-bold">SHIPPED</span>
+            <p className="text-xs font-mono text-foreground">{sub.trackingNumber}</p>
+            {sub.shippedAt && <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), "MM/dd/yy HH:mm")}</p>}
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="w-full h-8 text-xs border-primary text-primary hover:bg-primary/10" onClick={onShip}>
+            Mark as Shipped
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SubmissionRow({ sub, onDelete, onShip }: { sub: Submission; onDelete: () => void; onShip: () => void }) {
+  return (
+    <tr className="border-b border-border hover:bg-secondary/10">
+      <td className="px-3 py-3 whitespace-nowrap text-muted-foreground text-xs font-mono">{fmtDate(sub.createdAt)}</td>
+      <td className="px-3 py-3">
+        <span className={`px-2 py-0.5 rounded text-xs font-bold ${sub.type === "dealer" ? "bg-orange-500 text-white" : "bg-red-500 text-white"}`}>
+          {sub.type.toUpperCase()}
+        </span>
+      </td>
+      <td className="px-3 py-3">
+        <div className="font-semibold text-sm"><CopyableText text={sub.contactName || ""} /></div>
+        <div className="text-muted-foreground text-xs"><CopyableText text={sub.email} /></div>
+        {sub.phone && <div className="text-muted-foreground text-xs"><CopyableText text={sub.phone} /></div>}
+        {sub.businessName && <div className="mt-1 text-xs px-1.5 py-0.5 bg-secondary rounded inline-block">{sub.businessName}</div>}
+      </td>
+      <td className="px-3 py-3">
+        {sub.type === "dealer" ? (
+          <div className="space-y-1">
+            {sub.quantity && <div className="text-xs"><span className="text-muted-foreground">Qty:</span> <span className="font-medium text-foreground">{sub.quantity}</span></div>}
+            {sub.description && <div className="text-xs max-w-[200px] text-foreground italic">"{sub.description}"</div>}
+            {sub.fflFileName && (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">{sub.fflFileName}</span>
+                {sub.fflFileData && <FilePreview fileName={sub.fflFileName} fileData={sub.fflFileData} />}
+                {sub.fflFileData && <FileDownload fileName={sub.fflFileName} fileData={sub.fflFileData} />}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <div className="text-xs"><span className="text-muted-foreground">Serial:</span> <span className="font-mono text-foreground">{sub.serialNumber}</span></div>
+            <div className="text-xs text-foreground max-w-[250px]">{sub.description}</div>
+          </div>
+        )}
+      </td>
+      <td className="px-3 py-3">
+        {sub.trackingNumber ? (
+          <div className="space-y-1">
+            <span className="px-1.5 py-0.5 bg-green-600 text-white text-xs rounded font-bold">SHIPPED</span>
+            <p className="text-xs font-mono text-foreground">{sub.trackingNumber}</p>
+            {sub.shippedAt && <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), "MM/dd/yy HH:mm")}</p>}
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-primary text-primary hover:bg-primary/10" onClick={onShip}>
+            Mark Shipped
+          </Button>
+        )}
+      </td>
+      <td className="px-3 py-3">
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={onDelete}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
+// ── Dealers Tab ────────────────────────────────────────────────────────────────
+
+function DealersTab({ dealers, isLoading, onSelect, onAddNew }: {
+  dealers: Dealer[]; isLoading: boolean;
+  onSelect: (d: Dealer) => void; onAddNew: () => void;
+}) {
+  const [search, setSearch] = useState("");
+
+  const filtered = dealers.filter(d => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return `${d.businessName} ${d.contactName} ${d.email} ${d.city || ""} ${d.state || ""}`.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search dealers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-background h-9"
+          />
+        </div>
+        <Button onClick={onAddNew} className="h-9 text-sm gap-1.5">
+          <Building2 className="w-4 h-4" /> Add Dealer
+        </Button>
+        <Button variant="outline" onClick={async () => {
+          await fetch("/api/admin/dealers/link-submissions", { method: "POST" });
+        }} className="h-9 text-sm">
+          Link Submissions
+        </Button>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? <p className="text-center py-8 text-muted-foreground">Loading...</p>
+          : filtered.length === 0 ? <p className="text-center py-8 text-muted-foreground">
+            {dealers.length === 0 ? "No dealers yet. Add one or link submissions." : "No dealers match your search."}
+          </p>
+          : filtered.map(d => <DealerCard key={d.id} dealer={d} onClick={() => onSelect(d)} />)}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-xs text-muted-foreground uppercase bg-secondary/30">
+            <tr>
+              <th className="px-3 py-2">Business</th>
+              <th className="px-3 py-2">Contact</th>
+              <th className="px-3 py-2">EIN / SOT</th>
+              <th className="px-3 py-2">SOT Status</th>
+              <th className="px-3 py-2">Tax</th>
+              <th className="px-3 py-2">Orders</th>
+              <th className="px-3 py-2">Added</th>
+              <th className="px-3 py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? <tr><td colSpan={8} className="text-center py-8">Loading...</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">
+                {dealers.length === 0 ? "No dealers yet." : "No dealers match your search."}
+              </td></tr>
+              : filtered.map(d => <DealerRow key={d.id} dealer={d} onClick={() => onSelect(d)} />)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function DealerCard({ dealer, onClick }: { dealer: Dealer; onClick: () => void }) {
+  return (
+    <div className="border border-border rounded-lg p-3 bg-card hover:bg-secondary/5 cursor-pointer"
+      onClick={onClick}>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          <p className="font-semibold text-sm">{dealer.businessName}</p>
+          {dealer.city && dealer.state && <p className="text-xs text-muted-foreground">{dealer.city}, {dealer.state}</p>}
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        <SotBadge dealer={dealer} />
+        <TaxBadge dealer={dealer} />
+      </div>
+      <div className="flex gap-4 text-xs text-muted-foreground">
+        {dealer.demoCount !== undefined && <span>Demo: <strong className="text-foreground">{dealer.demoCount}</strong></span>}
+        {dealer.retailCount !== undefined && <span>Retail: <strong className="text-foreground">{dealer.retailCount}</strong></span>}
+        {dealer.orderCount !== undefined && <span>Total: <strong className="text-foreground">{dealer.orderCount}</strong></span>}
+      </div>
+    </div>
+  );
+}
+
+function DealerRow({ dealer, onClick }: { dealer: Dealer; onClick: () => void }) {
+  return (
+    <tr className="border-b border-border hover:bg-secondary/10 cursor-pointer" onClick={onClick}>
+      <td className="px-3 py-3">
+        <div className="font-semibold text-sm">{dealer.businessName}</div>
+        {dealer.city && dealer.state && <div className="text-xs text-muted-foreground">{dealer.city}, {dealer.state}</div>}
+      </td>
+      <td className="px-3 py-3">
+        <div className="text-sm">{dealer.contactName || "—"}</div>
+        <div className="text-xs text-muted-foreground"><CopyableText text={dealer.email || ""} /></div>
+      </td>
+      <td className="px-3 py-3">
+        {dealer.ein && <div className="text-xs font-mono">{dealer.ein}</div>}
+        {dealer.sotLicenseType && <div className="text-xs text-muted-foreground truncate max-w-[150px]">{dealer.sotLicenseType}</div>}
+      </td>
+      <td className="px-3 py-3"><SotBadge dealer={dealer} /></td>
+      <td className="px-3 py-3"><TaxBadge dealer={dealer} /></td>
+      <td className="px-3 py-3">
+        <div className="flex gap-3 text-xs">
+          {dealer.demoCount !== undefined && <span title="Demo orders">🎯 <strong>{dealer.demoCount}</strong></span>}
+          {dealer.retailCount !== undefined && <span title="Retail orders">📦 <strong>{dealer.retailCount}</strong></span>}
+        </div>
+      </td>
+      <td className="px-3 py-3 whitespace-nowrap text-xs text-muted-foreground font-mono">
+        {fmtDate(dealer.createdAt)}
+      </td>
+      <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500">
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
+// ── Dealer Detail / Edit View ─────────────────────────────────────────────────
+
+function DealerDetail({
+  dealer, onBack, onUpdate, onDeleteDealer, isSaving
+}: {
+  dealer: Dealer; onBack: () => void; onUpdate: (d: Dealer) => void; onDeleteDealer: () => void; isSaving: boolean;
+}) {
+  const { toast } = useToast();
+  const [editMode, setEditMode] = useState(false);
+  const [sotParsing, setSotParsing] = useState(false);
+  const [sotFile, setSotFile] = useState<File | null>(null);
+  const [sotPreview, setSotPreview] = useState<string | null>(null);
+  const [fflFile, setFflFile] = useState<File | null>(null);
+  const [fflPreview, setFflPreview] = useState<string | null>(null);
+  const [taxFile, setTaxFile] = useState<File | null>(null);
+  const [taxPreview, setTaxPreview] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  const form = useForm<DealerFormValues>({
+    resolver: zodResolver(dealerFormSchema),
+    defaultValues: {
+      businessName: dealer.businessName,
+      contactName: dealer.contactName || "",
+      email: dealer.email || "",
+      phone: dealer.phone || "",
+      ein: dealer.ein || "",
+      businessAddress: dealer.businessAddress || "",
+      city: dealer.city || "",
+      state: dealer.state || "",
+      zip: dealer.zip || "",
+      sotLicenseType: dealer.sotLicenseType || "",
+      sotTaxYear: dealer.sotTaxYear || "",
+      sotPeriodStart: dealer.sotPeriodStart || "",
+      sotPeriodEnd: dealer.sotPeriodEnd || "",
+      sotControlNumber: dealer.sotControlNumber || "",
+      sotReceiptDate: dealer.sotReceiptDate || "",
+      fflLicenseNumber: dealer.fflLicenseNumber || "",
+      fflLicenseType: dealer.fflLicenseType || "",
+      fflExpiry: dealer.fflExpiry || "",
+      taxExempt: dealer.taxExempt || false,
+      taxExemptNotes: dealer.taxExemptNotes || "",
+      salesTaxId: dealer.salesTaxId || "",
+      notes: dealer.notes || "",
+    },
+  });
+
+  const handleSotFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setSotPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    setSotFile(file);
+  };
+
+  const handleFflFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setFflPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    setFflFile(file);
+  };
+
+  const handleTaxFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setTaxPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    setTaxFile(file);
+  };
+
+  const handleParseSot = async () => {
+    if (!sotFile && !dealer.sotFileData) {
+      toast({ title: "No SOT File", description: "Upload an SOT file first, then parse it.", variant: "destructive" });
+      return;
+    }
+    setSotParsing(true);
+    try {
+      let fileData = dealer.sotFileData;
+      if (sotFile) {
+        fileData = await new Promise<string>((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res((reader.result as string).split(",")[1]);
+          reader.onerror = rej;
+          reader.readAsDataURL(sotFile);
+        });
+      }
+      const res = await fetch("/api/admin/dealers/parse-sot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sotFileData: fileData, sotFileName: sotFile?.name || dealer.sotFileName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const p = data.data.parsed;
+      if (p.businessName) form.setValue("businessName", p.businessName);
+      if (p.ein) form.setValue("ein", p.ein);
+      if (p.businessAddress) form.setValue("businessAddress", p.businessAddress);
+      if (p.zip) form.setValue("zip", p.zip);
+      if (p.state) form.setValue("state", p.state);
+      if (p.sotLicenseType) form.setValue("sotLicenseType", p.sotLicenseType);
+      if (p.sotTaxYear) form.setValue("sotTaxYear", p.sotTaxYear);
+      if (p.sotPeriodStart) form.setValue("sotPeriodStart", p.sotPeriodStart);
+      if (p.sotPeriodEnd) form.setValue("sotPeriodEnd", p.sotPeriodEnd);
+      if (p.sotControlNumber) form.setValue("sotControlNumber", p.sotControlNumber);
+      if (p.sotReceiptDate) form.setValue("sotReceiptDate", p.sotReceiptDate);
+
+      toast({ title: "SOT Parsed!", description: "Fields auto-filled from the SOT document." });
+    } catch (err: any) {
+      toast({ title: "Parse Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSotParsing(false);
+    }
+  };
+
+  const handleSave = async (values: DealerFormValues) => {
+    try {
+      let sotFileData = dealer.sotFileData;
+      let sotFileName = dealer.sotFileName;
+      if (sotFile) {
+        sotFileData = await new Promise<string>((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res((reader.result as string).split(",")[1]);
+          reader.onerror = rej;
+          reader.readAsDataURL(sotFile);
+        });
+        sotFileName = sotFile.name;
+      }
+
+      let fflFileData = dealer.fflFileData;
+      let fflFileName = dealer.fflFileName;
+      if (fflFile) {
+        fflFileData = await new Promise<string>((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res((reader.result as string).split(",")[1]);
+          reader.onerror = rej;
+          reader.readAsDataURL(fflFile);
+        });
+        fflFileName = fflFile.name;
+      }
+
+      const payload = {
+        ...values,
+        sotFileName,
+        sotFileData: sotFileData || undefined,
+        fflFileName,
+        fflFileData: fflFileData || undefined,
+      };
+
+      const res = await fetch(`/api/admin/dealers/${dealer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      toast({ title: "Saved!", description: "Dealer profile updated." });
+      setEditMode(false);
+      onUpdate({ ...dealer, ...values, sotFileName, sotFileData, fflFileName, fflFileData });
+    } catch (err: any) {
+      toast({ title: "Save Failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSaveTaxForm = async () => {
+    if (!taxFile) return;
+    try {
+      const fileData = await new Promise<string>((res, rej) => {
         const reader = new FileReader();
-        reader.onload = (ev) => setShipAtfPreview(ev.target?.result as string);
-        reader.readAsDataURL(file);
-        setShipAtfFile(file);
-    };
-
-    const handleShip = async () => {
-        if (!shipTarget || !shipTracking.trim()) {
-            toast({ title: "Tracking Required", description: "Please enter a tracking number.", variant: "destructive" });
-            return;
-        }
-        setIsShipping(true);
-        try {
-            let atfFormData: string | undefined;
-            if (shipAtfFile) {
-                atfFormData = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve((reader.result as string).split(",")[1]);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(shipAtfFile);
-                });
-            }
-            const res = await fetch(`/api/admin/submissions/${shipTarget.id}/ship`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    trackingNumber: shipTracking.trim(),
-                    atfFormName: shipAtfFile?.name || null,
-                    atfFormData: atfFormData || null,
-                }),
-            });
-            if (!res.ok) throw new Error("Ship failed");
-            const updated = { ...shipTarget, trackingNumber: shipTracking.trim(), shippedAt: new Date().toISOString() };
-            if (shipAtfFile) {
-                updated.atfFormName = shipAtfFile.name;
-                updated.atfFormData = atfFormData || undefined;
-            }
-            setSubmissions(prev => prev.map(s => s.id === shipTarget.id ? { ...s, ...updated } : s));
-            toast({ title: "Order Shipped", description: "Shipping info saved." });
-            setShipTarget(null);
-            setShipTracking("");
-            setShipAtfFile(null);
-            setShipAtfPreview(null);
-        } catch {
-            toast({ title: "Error", description: "Could not save shipping info.", variant: "destructive" });
-        } finally {
-            setIsShipping(false);
-        }
-    };
-
-    if (authStatus === 'checking') {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <p className="text-muted-foreground">Checking access...</p>
-            </div>
-        );
+        reader.onload = () => res((reader.result as string).split(",")[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(taxFile);
+      });
+      await fetch(`/api/admin/dealers/${dealer.id}/sales-tax-form`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ salesTaxFormName: taxFile.name, salesTaxFormData: fileData }),
+      });
+      toast({ title: "Tax Form Saved!", description: "Sales tax exemption form uploaded." });
+    } catch {
+      toast({ title: "Upload Failed", variant: "destructive" });
     }
+  };
 
-    if (authStatus === 'needs_pin' || authStatus === 'pin_sent') {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center p-6">
-                <Card className="w-full max-w-md bg-card border-border shadow-2xl pt-6">
-                    <CardHeader>
-                        <CardTitle className="text-2xl font-bold text-center">🔐 Admin Access</CardTitle>
-                        <p className="text-center text-muted-foreground text-sm mt-2">
-                            {authStatus === 'needs_pin'
-                                ? "Request a PIN to access the admin panel."
-                                : "Enter the PIN posted in #general on Discord."}
-                        </p>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {authStatus === 'needs_pin' && (
-                            <div className="space-y-3">
-                                <p className="text-sm text-muted-foreground text-center">
-                                    Clicking below will post a 6-digit PIN to the <strong>#general</strong> Discord channel.
-                                </p>
-                                <Button onClick={onRequestPin} className="w-full text-black bg-primary hover:bg-primary/90">
-                                    Request PIN
-                                </Button>
-                            </div>
-                        )}
-                        {authStatus === 'pin_sent' && (
-                            <Form {...pinForm}>
-                                <form onSubmit={pinForm.handleSubmit(onVerifyPin)} className="space-y-4">
-                                    <FormField
-                                        control={pinForm.control}
-                                        name="pin"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>6-Digit PIN</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        inputMode="numeric"
-                                                        pattern="[0-9]*"
-                                                        maxLength={6}
-                                                        placeholder="123456"
-                                                        className="text-center text-2xl tracking-widest font-mono bg-background"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <Button type="submit" className="w-full text-black bg-primary hover:bg-primary/90">
-                                        Unlock
-                                    </Button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAuthStatus('needs_pin')}
-                                        className="w-full text-xs text-muted-foreground hover:text-primary transition-colors"
-                                    >
-                                        Need a new PIN?
-                                    </button>
-                                </form>
-                            </Form>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </Button>
+        <div className="flex-1">
+          <h2 className="text-lg font-bold">{dealer.businessName}</h2>
+          {dealer.city && dealer.state && <p className="text-xs text-muted-foreground">{dealer.city}, {dealer.state}</p>}
+        </div>
+        <div className="flex gap-2">
+          <SotBadge dealer={dealer} />
+          <TaxBadge dealer={dealer} />
+        </div>
+        {!editMode ? (
+          <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>Edit</Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setEditMode(false); form.reset(); }}>Cancel</Button>
+            <Button size="sm" onClick={form.handleSubmit(handleSave)} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        )}
+      </div>
 
-    const filteredSubmissions = submissions.filter((sub) => {
-        if (typeFilter !== "all" && sub.type !== typeFilter) return false;
-
-        if (search) {
-            const query = search.toLowerCase();
-            const dateStr = format(parseISO(sub.createdAt), 'yyyy-MM-dd HH:mm').toLowerCase();
-            const searchable = `${dateStr} ${sub.contactName} ${sub.businessName} ${sub.email} ${sub.phone} ${sub.serialNumber} ${sub.description}`.toLowerCase();
-            if (!searchable.includes(query)) return false;
-        }
-        return true;
-    }).sort((a, b) => {
-        const dA = new Date(a.createdAt).getTime();
-        const dB = new Date(b.createdAt).getTime();
-        return sortDir === "desc" ? dB - dA : dA - dB;
-    });
-
-    // Format date as yyyy-MM-dd HH:mm (24hr)
-    const fmtDate = (d: string) => format(parseISO(d), 'yyyy-MM-dd HH:mm');
-
-    return (
-        <div className="min-h-screen bg-background p-4 md:p-8 lg:p-12">
-            <div className="max-w-7xl mx-auto space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <h1 className="text-2xl md:text-3xl font-bold font-display text-primary">Admin Dashboard</h1>
-                    <Button variant="outline" size="sm" onClick={onLogout}>Logout</Button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Main info */}
+        <div className="lg:col-span-2 space-y-4">
+          {editMode ? (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSave)} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="businessName"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>Business Name *</FormLabel>
+                        <FormControl><Input {...field} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="contactName"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>Contact Name</FormLabel>
+                        <FormControl><Input {...field} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="email"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>Email</FormLabel>
+                        <FormControl><Input {...field} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="phone"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>Phone</FormLabel>
+                        <FormControl><Input {...field} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="ein"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>EIN</FormLabel>
+                        <FormControl><Input {...field} placeholder="XX-XXXXXXX" className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="businessAddress"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>Street Address</FormLabel>
+                        <FormControl><Input {...field} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="city"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>City</FormLabel>
+                        <FormControl><Input {...field} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="state"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>State</FormLabel>
+                        <FormControl><Input {...field} maxLength={2} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                  <FormField control={form.control} name="zip"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>ZIP</FormLabel>
+                        <FormControl><Input {...field} className="bg-background" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
                 </div>
 
-                <Card className="bg-card/50 border-border">
-                    <CardContent className="p-4 md:p-6">
-                        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                            <Input
-                                placeholder="Search..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="sm:max-w-xs bg-background focus:ring-primary h-9"
-                            />
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                                className="h-9 rounded-md bg-background border border-border px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value="all">All</option>
-                                <option value="dealer">Dealer</option>
-                                <option value="warranty">Warranty</option>
-                            </select>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSortDir(d => d === "desc" ? "asc" : "desc")}
-                                className="h-9 whitespace-nowrap bg-background text-foreground text-xs"
-                            >
-                                {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
-                            </Button>
-                        </div>
+                {/* SOT Section */}
+                <div className="border-t border-border pt-4">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> SOT Information
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="sotLicenseType"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>License Type</FormLabel>
+                          <FormControl><Input {...field} placeholder="NFA FIREARMS MFGR (REDUCED)" className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="sotTaxYear"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Tax Year</FormLabel>
+                          <FormControl><Input {...field} placeholder="2026" className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="sotPeriodStart"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Period Start</FormLabel>
+                          <FormControl><Input {...field} placeholder="07/01/2025" className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="sotPeriodEnd"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Period End</FormLabel>
+                          <FormControl><Input {...field} placeholder="06/30/2026" className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="sotControlNumber"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Control Number</FormLabel>
+                          <FormControl><Input {...field} className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="sotReceiptDate"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Receipt Date</FormLabel>
+                          <FormControl><Input {...field} placeholder="July 03, 2025" className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                  </div>
 
-                        {/* ── Mobile: stacked cards ── */}
-                        <div className="block md:hidden space-y-3">
-                            {isLoading ? (
-                                <p className="text-center py-8 text-muted-foreground">Loading...</p>
-                            ) : filteredSubmissions.length === 0 ? (
-                                <p className="text-center py-8 text-muted-foreground">No submissions found.</p>
-                            ) : (
-                                filteredSubmissions.map((sub) => (
-                                    <div key={sub.id} className="relative border border-border rounded-lg p-3 bg-card hover:bg-secondary/5">
-                                        {/* Header row */}
-                                        <div className="flex items-start justify-between gap-2 mb-2">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${sub.type === 'dealer' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'}`}>
-                                                    {sub.type.toUpperCase()}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground font-mono">{fmtDate(sub.createdAt)}</span>
-                                            </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-red-500"
-                                                onClick={() => setDeleteTarget(sub)}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-
-                                        {/* Contact */}
-                                        <div className="space-y-1 mb-2">
-                                            <p className="text-sm font-semibold text-foreground">{sub.contactName}</p>
-                                            <p className="text-xs text-muted-foreground">{sub.email}</p>
-                                            {sub.phone && <p className="text-xs text-muted-foreground">{sub.phone}</p>}
-                                            {sub.businessName && (
-                                                <p className="text-xs px-1.5 py-0.5 bg-secondary rounded inline-block mt-0.5">{sub.businessName}</p>
-                                            )}
-                                        </div>
-
-                                        {/* Payload */}
-                                        <div className="border-t border-border pt-2 space-y-1">
-                                            {sub.type === 'dealer' ? (
-                                                <>
-                                                    {sub.quantity && <p className="text-xs text-muted-foreground">Qty: <span className="text-foreground font-medium">{sub.quantity}</span></p>}
-                                                    {sub.description && <p className="text-xs text-foreground italic">"{sub.description}"</p>}
-                                                    {sub.fflFileName && (
-                                                        <div className="mt-2 space-y-1">
-                                                            <p className="text-xs text-muted-foreground">SOT: {sub.fflFileName}</p>
-                                                            {sub.fflFileData && (
-                                                                <div className="flex gap-2 flex-wrap">
-                                                                    <Popover>
-                                                                        <PopoverTrigger asChild>
-                                                                            <Button variant="outline" size="sm" className="h-7 text-xs">View</Button>
-                                                                        </PopoverTrigger>
-                                                                        <PopoverContent className="w-80 p-1 border-border bg-card">
-                                                                            {sub.fflFileName?.toLowerCase().endsWith('.pdf') ? (
-                                                                                <iframe src={`data:application/pdf;base64,${sub.fflFileData}`} className="w-full rounded-sm" style={{ height: '400px' }} title="SOT Preview" />
-                                                                            ) : (
-                                                                                <img src={`data:image;base64,${sub.fflFileData}`} alt="SOT Preview" className="w-full h-auto rounded-sm" />
-                                                                            )}
-                                                                        </PopoverContent>
-                                                                    </Popover>
-                                                                    <Button variant="outline" size="sm" asChild className="h-7 text-xs">
-                                                                        <a href={`data:application/octet-stream;base64,${sub.fflFileData}`} download={sub.fflFileName}>
-                                                                            Download
-                                                                        </a>
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <p className="text-xs text-muted-foreground">Serial: <span className="font-mono text-foreground">{sub.serialNumber}</span></p>
-                                                    <p className="text-xs text-foreground">{sub.description}</p>
-                                                </>
-                                            )}
-                                        </div>
-
-                                        {/* Shipping */}
-                                        <div className="border-t border-border pt-2 mt-2">
-                                            {sub.trackingNumber ? (
-                                                <div className="space-y-1">
-                                                    <span className="px-1.5 py-0.5 bg-green-600 text-white text-xs rounded font-bold">SHIPPED</span>
-                                                    <p className="text-xs font-mono text-foreground">{sub.trackingNumber}</p>
-                                                    {sub.shippedAt && <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), 'MM/dd/yy HH:mm')}</p>}
-                                                    {sub.atfFormData && (
-                                                        <div className="flex gap-2 mt-1">
-                                                            <Popover>
-                                                                <PopoverTrigger asChild>
-                                                                    <Button variant="outline" size="sm" className="h-7 text-xs">View ATF</Button>
-                                                                </PopoverTrigger>
-                                                                <PopoverContent className="w-80 p-1 border-border bg-card">
-                                                                    {sub.atfFormName?.toLowerCase().endsWith('.pdf') ? (
-                                                                        <iframe src={`data:application/pdf;base64,${sub.atfFormData}`} className="w-full rounded-sm" style={{ height: '400px' }} title="ATF Form Preview" />
-                                                                    ) : (
-                                                                        <img src={`data:image;base64,${sub.atfFormData}`} alt="ATF Form Preview" className="w-full h-auto rounded-sm" />
-                                                                    )}
-                                                                </PopoverContent>
-                                                            </Popover>
-                                                            <Button variant="outline" size="sm" asChild className="h-7 text-xs">
-                                                                <a href={`data:application/octet-stream;base64,${sub.atfFormData}`} download={sub.atfFormName || "atf-form"}>
-                                                                    Download ATF
-                                                                </a>
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="w-full h-8 text-xs border-primary text-primary hover:bg-primary/10"
-                                                    onClick={() => { setShipTarget(sub); setShipTracking(""); setShipAtfFile(null); setShipAtfPreview(null); }}
-                                                >
-                                                    Mark as Shipped
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-
-                        {/* ── Desktop: table ── */}
-                        <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-muted-foreground uppercase bg-secondary/30">
-                                    <tr>
-                                        <th className="px-3 py-2">Date</th>
-                                        <th className="px-3 py-2">Type</th>
-                                        <th className="px-3 py-2 min-w-[180px]">Details</th>
-                                        <th className="px-3 py-2">Message / Payload</th>
-                                        <th className="px-3 py-2">Shipping</th>
-                                        <th className="px-3 py-2 w-10"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {isLoading ? (
-                                        <tr>
-                                            <td colSpan={6} className="text-center py-8">Loading...</td>
-                                        </tr>
-                                    ) : filteredSubmissions.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="text-center py-8 text-muted-foreground">No submissions found.</td>
-                                        </tr>
-                                    ) : (
-                                        filteredSubmissions.map((sub) => (
-                                            <tr key={sub.id} className="border-b border-border hover:bg-secondary/10">
-                                                <td className="px-3 py-3 whitespace-nowrap text-muted-foreground text-xs font-mono">
-                                                    {fmtDate(sub.createdAt)}
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${sub.type === 'dealer' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'}`}>
-                                                        {sub.type.toUpperCase()}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <div className="font-semibold text-foreground text-sm">
-                                                        <CopyableText text={sub.contactName} />
-                                                    </div>
-                                                    <div className="text-muted-foreground text-xs">
-                                                        <CopyableText text={sub.email} />
-                                                    </div>
-                                                    {sub.phone && (
-                                                        <div className="text-muted-foreground text-xs"><CopyableText text={sub.phone} /></div>
-                                                    )}
-                                                    {sub.businessName && (
-                                                        <div className="mt-1 text-xs px-1.5 py-0.5 bg-secondary rounded inline-block">{sub.businessName}</div>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    {sub.type === 'dealer' ? (
-                                                        <div className="space-y-1">
-                                                            {sub.quantity && <div className="text-xs"><span className="text-muted-foreground">Qty:</span> <span className="font-medium text-foreground">{sub.quantity}</span></div>}
-                                                            {sub.description && <div className="text-xs max-w-[200px] text-foreground italic">"{sub.description}"</div>}
-                                                            {sub.fflFileName && (
-                                                                <div className="text-xs text-muted-foreground">{sub.fflFileName}</div>
-                                                            )}
-                                                            {sub.fflFileData && sub.fflFileName && (
-                                                                <div className="flex gap-1 mt-1">
-                                                                    <Popover>
-                                                                        <PopoverTrigger asChild>
-                                                                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                                                                                <ImageIcon className="h-3.5 w-3.5" />
-                                                                            </Button>
-                                                                        </PopoverTrigger>
-                                                                        <PopoverContent className="w-96 p-1 border-border bg-card">
-                                                                            {sub.fflFileName?.toLowerCase().endsWith('.pdf') ? (
-                                                                                <iframe src={`data:application/pdf;base64,${sub.fflFileData}`} className="w-full rounded-sm" style={{ height: '500px' }} title="SOT Preview" />
-                                                                            ) : (
-                                                                                <img src={`data:image;base64,${sub.fflFileData}`} alt="SOT Preview" className="w-full h-auto rounded-sm" />
-                                                                            )}
-                                                                        </PopoverContent>
-                                                                    </Popover>
-                                                                    <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                                                                        <a href={`data:application/octet-stream;base64,${sub.fflFileData}`} download={sub.fflFileName}>
-                                                                            <Download className="h-3.5 w-3.5" />
-                                                                        </a>
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-1">
-                                                            <div className="text-xs"><span className="text-muted-foreground">Serial:</span> <span className="font-mono text-foreground">{sub.serialNumber}</span></div>
-                                                            <div className="text-xs text-foreground max-w-[250px]">{sub.description}</div>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                {/* Shipping column */}
-                                                <td className="px-3 py-3">
-                                                    {sub.trackingNumber ? (
-                                                        <div className="space-y-1">
-                                                            <span className="px-1.5 py-0.5 bg-green-600 text-white text-xs rounded font-bold">SHIPPED</span>
-                                                            <p className="text-xs font-mono text-foreground">{sub.trackingNumber}</p>
-                                                            {sub.shippedAt && (
-                                                                <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), 'MM/dd/yy HH:mm')}</p>
-                                                            )}
-                                                            {sub.atfFormData && (
-                                                                <div className="flex gap-1 mt-1">
-                                                                    <Popover>
-                                                                        <PopoverTrigger asChild>
-                                                                            <Button variant="ghost" size="icon" className="h-5 w-5">
-                                                                                <ImageIcon className="h-3 w-3" />
-                                                                            </Button>
-                                                                        </PopoverTrigger>
-                                                                        <PopoverContent className="w-80 p-1 border-border bg-card">
-                                                                            {sub.atfFormName?.toLowerCase().endsWith('.pdf') ? (
-                                                                                <iframe src={`data:application/pdf;base64,${sub.atfFormData}`} className="w-full rounded-sm" style={{ height: '400px' }} title="ATF Form Preview" />
-                                                                            ) : (
-                                                                                <img src={`data:image;base64,${sub.atfFormData}`} alt="ATF Form Preview" className="w-full h-auto rounded-sm" />
-                                                                            )}
-                                                                        </PopoverContent>
-                                                                    </Popover>
-                                                                    <Button variant="ghost" size="icon" className="h-5 w-5" asChild>
-                                                                        <a href={`data:application/octet-stream;base64,${sub.atfFormData}`} download={sub.atfFormName || "atf-form"}>
-                                                                            <Download className="h-3 w-3" />
-                                                                        </a>
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-7 text-xs whitespace-nowrap border-primary text-primary hover:bg-primary/10"
-                                                            onClick={() => { setShipTarget(sub); setShipTracking(""); setShipAtfFile(null); setShipAtfPreview(null); }}
-                                                        >
-                                                            Mark Shipped
-                                                        </Button>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                                                        onClick={() => setDeleteTarget(sub)}
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-                <AlertDialogContent className="bg-card border-border">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Submission?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-muted-foreground">
-                            This will permanently remove the submission from {deleteTarget?.contactName} ({deleteTarget?.email}). This cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-secondary text-foreground hover:bg-secondary/80 border-border">
-                            Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-red-600 text-white hover:bg-red-700"
-                            onClick={handleDelete}
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <Dialog open={!!shipTarget} onOpenChange={(open) => !open && setShipTarget(null)}>
-                <DialogContent className="bg-card border-border max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="text-lg font-bold">Mark Order as Shipped</DialogTitle>
-                        {shipTarget && (
-                            <p className="text-sm text-muted-foreground">
-                                {shipTarget.contactName} · {shipTarget.businessName} · Qty: {shipTarget.quantity || 'N/A'}
-                            </p>
+                  {/* SOT file upload */}
+                  <div className="mt-3 space-y-2">
+                    <label className="text-sm font-medium block">SOT Document</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <div className="border-2 border-dashed border-border rounded-lg p-3 text-center hover:border-primary/50 transition-colors cursor-pointer flex-1 min-w-[200px]"
+                        onClick={() => document.getElementById("sot-file-input")?.click()}>
+                        <input id="sot-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleSotFileChange} />
+                        {sotPreview ? (
+                          <div className="space-y-1">
+                            <img src={sotPreview} alt="SOT preview" className="max-h-24 mx-auto rounded object-contain" />
+                            <p className="text-xs text-muted-foreground">{sotFile?.name}</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Upload className="h-6 w-6 mx-auto text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">Click to upload SOT</p>
+                          </div>
                         )}
-                    </DialogHeader>
-
-                    <div className="space-y-4 py-2">
-                        <div>
-                            <label className="text-sm font-medium block mb-1.5">
-                                Tracking Number <span className="text-red-500">*</span>
-                            </label>
-                            <Input
-                                placeholder="1Z999AA10123456784"
-                                value={shipTracking}
-                                onChange={(e) => setShipTracking(e.target.value)}
-                                className="bg-background"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium block mb-1.5">
-                                ATF Form 5320.3 <span className="text-xs text-muted-foreground font-normal">(optional)</span>
-                            </label>
-                            <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                                onClick={() => document.getElementById('atf-file-input')?.click()}>
-                                <input
-                                    id="atf-file-input"
-                                    type="file"
-                                    accept=".pdf,.png,.jpg,.jpeg"
-                                    className="hidden"
-                                    onChange={handleAtfFileChange}
-                                />
-                                {shipAtfPreview ? (
-                                    <div className="space-y-2">
-                                        <img
-                                            src={shipAtfPreview}
-                                            alt="ATF Form preview"
-                                            className="max-h-32 mx-auto rounded object-contain"
-                                        />
-                                        <p className="text-xs text-muted-foreground">{shipAtfFile?.name}</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-1">
-                                        <Package className="h-8 w-8 mx-auto text-muted-foreground" />
-                                        <p className="text-sm text-muted-foreground">Click to upload ATF Form 5320.3</p>
-                                        <p className="text-xs text-muted-foreground">PDF, PNG, JPG accepted</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShipTarget(null)} className="border-border">Cancel</Button>
-                        <Button
-                            className="bg-primary text-primary-foreground hover:bg-primary/90"
-                            onClick={handleShip}
-                            disabled={isShipping}
-                        >
-                            {isShipping ? "Saving..." : "Confirm & Save"}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {dealer.sotFileData && dealer.sotFileName && (
+                          <>
+                            <FilePreview fileName={dealer.sotFileName} fileData={dealer.sotFileData} label="View Current" />
+                            <FileDownload fileName={dealer.sotFileName} fileData={dealer.sotFileData} />
+                          </>
+                        )}
+                        <Button type="button" variant="outline" size="sm" onClick={handleParseSot} disabled={sotParsing}
+                          className="h-7 text-xs whitespace-nowrap">
+                          {sotParsing ? "Parsing..." : "🤖 Parse SOT"}
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* FFL Section */}
+                <div className="border-t border-border pt-4">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> FFL Information
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FormField control={form.control} name="fflLicenseNumber"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>License Number</FormLabel>
+                          <FormControl><Input {...field} className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="fflLicenseType"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>License Type</FormLabel>
+                          <FormControl><Input {...field} className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="fflExpiry"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Expiry Date</FormLabel>
+                          <FormControl><Input {...field} className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                  </div>
+
+                  {/* FFL file upload */}
+                  <div className="mt-3 space-y-2">
+                    <label className="text-sm font-medium block">FFL Document</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <div className="border-2 border-dashed border-border rounded-lg p-3 text-center hover:border-primary/50 transition-colors cursor-pointer flex-1 min-w-[200px]"
+                        onClick={() => document.getElementById("ffl-file-input")?.click()}>
+                        <input id="ffl-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleFflFileChange} />
+                        {fflPreview ? (
+                          <div className="space-y-1">
+                            <img src={fflPreview} alt="FFL preview" className="max-h-24 mx-auto rounded object-contain" />
+                            <p className="text-xs text-muted-foreground">{fflFile?.name}</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Upload className="h-6 w-6 mx-auto text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">Click to upload FFL</p>
+                          </div>
+                        )}
+                      </div>
+                      {dealer.fflFileData && dealer.fflFileName && (
+                        <div className="flex flex-col gap-1">
+                          <FilePreview fileName={dealer.fflFileName} fileData={dealer.fflFileData} label="View Current" />
+                          <FileDownload fileName={dealer.fflFileName} fileData={dealer.fflFileData} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tax Section */}
+                <div className="border-t border-border pt-4">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    Tax Exemption
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="taxExempt"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2 h-10">
+                          <FormControl><input type="checkbox" className="w-4 h-4 accent-primary"
+                            checked={field.value || false} onChange={field.onChange} /></FormControl>
+                          <FormLabel className="mb-0">Tax Exempt</FormLabel>
+                          <FormMessage /></FormItem>
+                      )} />
+                    <FormField control={form.control} name="salesTaxId"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Sales Tax ID / Exemption #</FormLabel>
+                          <FormControl><Input {...field} className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                  </div>
+                  <FormField control={form.control} name="taxExemptNotes"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>Tax Notes</FormLabel>
+                        <FormControl><Textarea {...field} rows={2} className="bg-background" placeholder="e.g. Texas — no state sales tax on NFA items" /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+
+                  {/* Tax form upload */}
+                  <div className="mt-3 space-y-2">
+                    <label className="text-sm font-medium block">Sales Tax Exemption Form</label>
+                    <div className="flex gap-2 flex-wrap">
+                      <div className="border-2 border-dashed border-border rounded-lg p-3 text-center hover:border-primary/50 transition-colors cursor-pointer flex-1 min-w-[200px]"
+                        onClick={() => document.getElementById("tax-file-input")?.click()}>
+                        <input id="tax-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleTaxFileChange} />
+                        {taxPreview ? (
+                          <div className="space-y-1">
+                            <img src={taxPreview} alt="Tax form preview" className="max-h-24 mx-auto rounded object-contain" />
+                            <p className="text-xs text-muted-foreground">{taxFile?.name}</p>
+                          </div>
+                        ) : dealer.salesTaxFormData && dealer.salesTaxFormName ? (
+                          <div className="space-y-1">
+                            <FileText className="h-6 w-6 mx-auto text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">{dealer.salesTaxFormName} (current)</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Upload className="h-6 w-6 mx-auto text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">Click to upload tax form</p>
+                          </div>
+                        )}
+                      </div>
+                      {taxFile && (
+                        <Button type="button" size="sm" onClick={handleSaveTaxForm} className="h-9">
+                          Save Tax Form
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="border-t border-border pt-4">
+                  <FormField control={form.control} name="notes"
+                    render={({ field }) => (
+                      <FormItem><FormLabel>Internal Notes</FormLabel>
+                        <FormControl><Textarea {...field} rows={3} className="bg-background"
+                          placeholder="Private notes about this dealer..." /></FormControl>
+                        <FormMessage /></FormItem>
+                    )} />
+                </div>
+              </form>
+            </Form>
+          ) : (
+            /* Read-only view */
+            <div className="space-y-4">
+              {/* Contact & Business */}
+              <Card className="bg-card/50 border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Business & Contact</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {dealer.contactName && <div><span className="text-muted-foreground text-xs">Contact:</span> <strong>{dealer.contactName}</strong></div>}
+                  {dealer.email && <div><span className="text-muted-foreground text-xs">Email:</span> <CopyableText text={dealer.email} /></div>}
+                  {dealer.phone && <div><span className="text-muted-foreground text-xs">Phone:</span> <CopyableText text={dealer.phone} /></div>}
+                  {dealer.ein && <div><span className="text-muted-foreground text-xs">EIN:</span> <CopyableText text={dealer.ein} /></div>}
+                  {dealer.businessAddress && <div><span className="text-muted-foreground text-xs">Address:</span> {dealer.businessAddress}</div>}
+                  {(dealer.city || dealer.state || dealer.zip) && (
+                    <div><span className="text-muted-foreground text-xs">City/State/ZIP:</span> {[dealer.city, dealer.state, dealer.zip].filter(Boolean).join(", ")}</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* SOT */}
+              <Card className="bg-card/50 border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> SOT Information
+                    <SotBadge dealer={dealer} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {dealer.sotLicenseType && <div><span className="text-muted-foreground text-xs">Type:</span> {dealer.sotLicenseType}</div>}
+                  {dealer.sotTaxYear && <div><span className="text-muted-foreground text-xs">Tax Year:</span> {dealer.sotTaxYear}</div>}
+                  {(dealer.sotPeriodStart || dealer.sotPeriodEnd) && (
+                    <div><span className="text-muted-foreground text-xs">Period:</span> {dealer.sotPeriodStart} — {dealer.sotPeriodEnd}</div>
+                  )}
+                  {dealer.sotControlNumber && <div><span className="text-muted-foreground text-xs">Control #:</span> <CopyableText text={dealer.sotControlNumber} /></div>}
+                  {dealer.sotReceiptDate && <div><span className="text-muted-foreground text-xs">Receipt Date:</span> {dealer.sotReceiptDate}</div>}
+                  {dealer.sotFileName && (
+                    <div className="flex gap-2 items-center">
+                      <span className="text-muted-foreground text-xs">Document:</span>
+                      <span className="text-xs">{dealer.sotFileName}</span>
+                      {dealer.sotFileData && <><FilePreview fileName={dealer.sotFileName} fileData={dealer.sotFileData} /><FileDownload fileName={dealer.sotFileName} fileData={dealer.sotFileData} /></>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* FFL */}
+              <Card className="bg-card/50 border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> FFL Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {dealer.fflLicenseNumber && <div><span className="text-muted-foreground text-xs">License #:</span> <CopyableText text={dealer.fflLicenseNumber} /></div>}
+                  {dealer.fflLicenseType && <div><span className="text-muted-foreground text-xs">Type:</span> {dealer.fflLicenseType}</div>}
+                  {dealer.fflExpiry && <div><span className="text-muted-foreground text-xs">Expires:</span> {dealer.fflExpiry}</div>}
+                  {dealer.fflFileName && (
+                    <div className="flex gap-2 items-center">
+                      <span className="text-muted-foreground text-xs">Document:</span>
+                      <span className="text-xs">{dealer.fflFileName}</span>
+                      {dealer.fflFileData && <><FilePreview fileName={dealer.fflFileName} fileData={dealer.fflFileData} /><FileDownload fileName={dealer.fflFileName} fileData={dealer.fflFileData} /></>}
+                    </div>
+                  )}
+                  {!dealer.fflLicenseNumber && !dealer.fflFileName && (
+                    <p className="text-xs text-muted-foreground italic">No FFL on file.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Tax */}
+              <Card className="bg-card/50 border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    Tax Exemption <TaxBadge dealer={dealer} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {dealer.taxExempt ? (
+                    <>
+                      <div><span className="text-muted-foreground text-xs">Status:</span> <strong>Tax Exempt</strong></div>
+                      {dealer.salesTaxId && <div><span className="text-muted-foreground text-xs">Tax ID:</span> <CopyableText text={dealer.salesTaxId} /></div>}
+                      {dealer.taxExemptNotes && <div className="text-xs italic">{dealer.taxExemptNotes}</div>}
+                    </>
+                  ) : <p className="text-xs text-muted-foreground italic">No tax exemption on file.</p>}
+                  {dealer.salesTaxFormData && dealer.salesTaxFormName && (
+                    <div className="flex gap-2 items-center">
+                      <span className="text-muted-foreground text-xs">Form:</span>
+                      <span className="text-xs">{dealer.salesTaxFormName}</span>
+                      <FilePreview fileName={dealer.salesTaxFormName} fileData={dealer.salesTaxFormData} label="View" />
+                      <FileDownload fileName={dealer.salesTaxFormName} fileData={dealer.salesTaxFormData} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Notes */}
+              {dealer.notes && (
+                <Card className="bg-card/50 border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Internal Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm italic whitespace-pre-wrap">{dealer.notes}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Sidebar: submission history */}
+        <div className="space-y-4">
+          <Card className="bg-card/50 border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Inbox className="w-4 h-4" /> Order History
+                {dealer.orderCount !== undefined && (
+                  <Badge variant="secondary" className="text-xs ml-auto">{dealer.orderCount}</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dealer.submissions && dealer.submissions.length > 0 ? (
+                <div className="space-y-2">
+                  {dealer.submissions.map(sub => (
+                    <div key={sub.id} className="border-b border-border pb-2 last:border-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
+                          sub.order_type === "demo_order" ? "bg-blue-600 text-white" :
+                          sub.order_type === "retail_order" ? "bg-orange-500 text-white" :
+                          "bg-gray-500 text-white"
+                        }`}>
+                          {sub.order_type === "demo_order" ? "DEMO" :
+                           sub.order_type === "retail_order" ? "RETAIL" : "INQUIRY"}
+                        </span>
+                        {sub.quantity && sub.quantity !== "1" && (
+                          <span className="text-xs text-muted-foreground">×{sub.quantity}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono mt-0.5">{fmtDate(sub.createdAt)}</p>
+                      {sub.trackingNumber && (
+                        <p className="text-xs font-mono text-green-600 mt-0.5">✓ {sub.trackingNumber}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">No submissions linked.</p>
+              )}
+              <div className="mt-3 pt-2 border-t border-border text-xs text-muted-foreground flex gap-3">
+                {dealer.demoCount !== undefined && <span>🎯 Demo: {dealer.demoCount}</span>}
+                {dealer.retailCount !== undefined && <span>📦 Retail: {dealer.retailCount}</span>}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Quick Info</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-xs">
+              <div><span className="text-muted-foreground">Added:</span> {fmtDate(dealer.createdAt)}</div>
+              <div><span className="text-muted-foreground">Updated:</span> {dealer.updatedAt ? fmtDate(dealer.updatedAt) : "—"}</div>
+              <div><span className="text-muted-foreground">Dealer ID:</span>
+                <CopyableText text={dealer.id} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Button variant="destructive" className="w-full text-sm" onClick={() => setDeleteConfirm(true)}>
+            <Trash2 className="w-4 h-4 mr-1.5" /> Delete Dealer
+          </Button>
+        </div>
+      </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Dealer?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This will permanently delete {dealer.businessName} and all linked submission records. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-secondary text-foreground border-border">Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" onClick={onDeleteDealer}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ── Add Dealer Dialog ──────────────────────────────────────────────────────────
+
+function AddDealerDialog({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (d: Dealer) => void }) {
+  const { toast } = useToast();
+  const form = useForm<DealerFormValues>({
+    resolver: zodResolver(dealerFormSchema),
+    defaultValues: { businessName: "", contactName: "", email: "", phone: "", ein: "", businessAddress: "", city: "", state: "", zip: "" },
+  });
+
+  const handleAdd = async (values: DealerFormValues) => {
+    try {
+      const res = await fetch("/api/admin/dealers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast({ title: "Dealer Added!", description: `${values.businessName} has been added.` });
+      onAdd({ ...data.data, orderCount: 0, demoCount: 0, retailCount: 0, submissions: [] });
+      form.reset();
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="bg-card border-border max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-bold">Add New Dealer</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleAdd)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="businessName"
+                render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>Business Name *</FormLabel>
+                    <FormControl><Input {...field} className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="contactName"
+                render={({ field }) => (
+                  <FormItem><FormLabel>Contact Name</FormLabel>
+                    <FormControl><Input {...field} className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="phone"
+                render={({ field }) => (
+                  <FormItem><FormLabel>Phone</FormLabel>
+                    <FormControl><Input {...field} className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="email"
+                render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>Email</FormLabel>
+                    <FormControl><Input {...field} type="email" className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="businessAddress"
+                render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>Street Address</FormLabel>
+                    <FormControl><Input {...field} className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="city"
+                render={({ field }) => (
+                  <FormItem><FormLabel>City</FormLabel>
+                    <FormControl><Input {...field} className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="state"
+                render={({ field }) => (
+                  <FormItem><FormLabel>State</FormLabel>
+                    <FormControl><Input {...field} maxLength={2} className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="zip"
+                render={({ field }) => (
+                  <FormItem><FormLabel>ZIP</FormLabel>
+                    <FormControl><Input {...field} className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="ein"
+                render={({ field }) => (
+                  <FormItem><FormLabel>EIN</FormLabel>
+                    <FormControl><Input {...field} placeholder="XX-XXXXXXX" className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose} className="border-border">Cancel</Button>
+              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">Add Dealer</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Ship Dialog ───────────────────────────────────────────────────────────────
+
+function ShipDialog({ sub, open, onClose }: {
+  sub: Submission | null; open: boolean; onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [tracking, setTracking] = useState("");
+  const [atfFile, setAtfFile] = useState<File | null>(null);
+  const [atfPreview, setAtfPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (!open) { setTracking(""); setAtfFile(null); setAtfPreview(null); } }, [open]);
+
+  const handleAtfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setAtfPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    setAtfFile(file);
+  };
+
+  const handleShip = async () => {
+    if (!sub || !tracking.trim()) { toast({ title: "Tracking Required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      let atfData: string | undefined;
+      if (atfFile) {
+        atfData = await new Promise<string>((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res((reader.result as string).split(",")[1]);
+          reader.onerror = rej;
+          reader.readAsDataURL(atfFile);
+        });
+      }
+      const res = await fetch(`/api/admin/submissions/${sub.id}/ship`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackingNumber: tracking.trim(), atfFormName: atfFile?.name || null, atfFormData: atfData || null }),
+      });
+      if (!res.ok) throw new Error("Ship failed");
+      toast({ title: "Order Shipped!", description: `Tracking: ${tracking.trim()}` });
+      onClose();
+    } catch { toast({ title: "Error", variant: "destructive" }); } finally { setSaving(false); }
+  };
+
+  if (!sub) return null;
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="bg-card border-border max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold">Mark Order as Shipped</DialogTitle>
+          <p className="text-sm text-muted-foreground">{sub.contactName} · {sub.businessName} · Qty: {sub.quantity || "N/A"}</p>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-sm font-medium block mb-1.5">Tracking Number <span className="text-red-500">*</span></label>
+            <Input placeholder="1Z999AA10123456784" value={tracking} onChange={e => setTracking(e.target.value)} className="bg-background" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1.5">ATF Form 5320.3 <span className="text-xs text-muted-foreground font-normal">(optional)</span></label>
+            <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
+              onClick={() => document.getElementById("atf-file-input")?.click()}>
+              <input id="atf-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleAtfChange} />
+              {atfPreview ? (
+                <div className="space-y-2">
+                  <img src={atfPreview} alt="ATF preview" className="max-h-32 mx-auto rounded object-contain" />
+                  <p className="text-xs text-muted-foreground">{atfFile?.name}</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Package className="h-8 w-8 mx-auto text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Click to upload ATF Form 5320.3</p>
+                  <p className="text-xs text-muted-foreground">PDF, PNG, JPG accepted</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} className="border-border">Cancel</Button>
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleShip} disabled={saving}>
+            {saving ? "Saving..." : "Confirm & Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Main AdminPage ─────────────────────────────────────────────────────────────
+
+export default function AdminPage() {
+  const { toast } = useToast();
+  const [authStatus, setAuthStatus] = useState<"checking" | "needs_pin" | "pin_sent" | "authorized">("checking");
+  const [tab, setTab] = useState<Tab>("submissions");
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [dealers, setDealers] = useState<Dealer[]>([]);
+  const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [deleteTarget, setDeleteTarget] = useState<Submission | null>(null);
+  const [shipTarget, setShipTarget] = useState<Submission | null>(null);
+  const [addDealerOpen, setAddDealerOpen] = useState(false);
+
+  const pinForm = useForm<z.infer<typeof pinSchema>>({ resolver: zodResolver(pinSchema), defaultValues: { pin: "" } });
+
+  const fetchSubmissions = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch("/api/admin/submissions");
+      if (res.status === 403) { setAuthStatus("needs_pin"); setIsLoading(false); return; }
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      setSubmissions(data.data || []);
+      setAuthStatus("authorized");
+    } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
+    finally { setIsLoading(false); }
+  }, []);
+
+  const fetchDealers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/dealers");
+      if (!res.ok) throw new Error("Failed to fetch dealers");
+      const data = await res.json();
+      setDealers(data.data || []);
+    } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/check-auth")
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data.authorized) { fetchSubmissions(); fetchDealers(); setAuthStatus("authorized"); }
+        else setAuthStatus("needs_pin");
+      })
+      .catch(() => { if (!cancelled) setAuthStatus("needs_pin"); });
+    return () => { cancelled = true; };
+  }, [fetchSubmissions, fetchDealers]);
+
+  const onRequestPin = async () => {
+    try {
+      const res = await fetch("/api/admin/request-pin", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: "Request Failed", description: data.error || "Could not request PIN", variant: "destructive" }); return; }
+      toast({ title: "PIN Sent", description: "Check the #general channel on Discord for your PIN." });
+      setAuthStatus("pin_sent");
+    } catch { toast({ title: "Error", description: "Network error", variant: "destructive" }); }
+  };
+
+  const onVerifyPin = async (values: z.infer<typeof pinSchema>) => {
+    try {
+      const res = await fetch("/api/admin/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: values.pin }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: "Invalid PIN", description: data.error || "The PIN was invalid or expired.", variant: "destructive" }); pinForm.reset(); return; }
+      setAuthStatus("authorized");
+      fetchSubmissions();
+      fetchDealers();
+    } catch { toast({ title: "Error", description: "Network error", variant: "destructive" }); }
+  };
+
+  const onLogout = async () => {
+    await fetch("/api/admin/logout", { method: "POST" });
+    setAuthStatus("needs_pin");
+    setSubmissions([]);
+    setDealers([]);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      const res = await fetch(`/api/admin/submissions/${deleteTarget.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      setSubmissions(prev => prev.filter(s => s.id !== deleteTarget.id));
+      toast({ title: "Deleted", description: "Submission removed." });
+    } catch { toast({ title: "Error", description: "Could not delete.", variant: "destructive" }); }
+    finally { setDeleteTarget(null); }
+  };
+
+  const handleDeleteDealer = async () => {
+    if (!selectedDealer) return;
+    try {
+      const res = await fetch(`/api/admin/dealers/${selectedDealer.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      setDealers(prev => prev.filter(d => d.id !== selectedDealer.id));
+      setSelectedDealer(null);
+      toast({ title: "Dealer Deleted" });
+    } catch { toast({ title: "Error", description: "Could not delete dealer.", variant: "destructive" }); }
+  };
+
+  const handleUpdateDealer = (updated: Dealer) => {
+    setDealers(prev => prev.map(d => d.id === updated.id ? updated : d));
+    setSelectedDealer(updated);
+  };
+
+  if (authStatus === "checking") {
+    return <div className="min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground">Checking access...</p></div>;
+  }
+
+  if (authStatus === "needs_pin" || authStatus === "pin_sent") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="w-full max-w-md bg-card border-border shadow-2xl pt-6">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-center">🔐 Admin Access</CardTitle>
+            <p className="text-center text-muted-foreground text-sm mt-2">
+              {authStatus === "needs_pin" ? "Request a PIN to access the admin panel."
+                : "Enter the PIN posted in #general on Discord."}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {authStatus === "needs_pin" && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground text-center">
+                  Clicking below will post a 6-digit PIN to the <strong>#general</strong> Discord channel.
+                </p>
+                <Button onClick={onRequestPin} className="w-full text-black bg-primary hover:bg-primary/90">
+                  Request PIN
+                </Button>
+              </div>
+            )}
+            {authStatus === "pin_sent" && (
+              <Form {...pinForm}>
+                <form onSubmit={pinForm.handleSubmit(onVerifyPin)} className="space-y-4">
+                  <FormField control={pinForm.control} name="pin"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>6-Digit PIN</FormLabel>
+                        <FormControl>
+                          <Input inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="123456"
+                            className="text-center text-2xl tracking-widest font-mono bg-background" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  <Button type="submit" className="w-full text-black bg-primary hover:bg-primary/90">Unlock</Button>
+                  <button type="button" onClick={() => setAuthStatus("needs_pin")}
+                    className="w-full text-xs text-muted-foreground hover:text-primary transition-colors">Need a new PIN?</button>
+                </form>
+              </Form>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     );
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-8 lg:p-12">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold font-display text-primary">Admin Dashboard</h1>
+          <Button variant="outline" size="sm" onClick={onLogout}>Logout</Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-border">
+          <button
+            onClick={() => { setTab("submissions"); setSelectedDealer(null); }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === "submissions" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Inbox className="w-4 h-4 inline mr-1.5" />Submissions
+            <Badge variant="secondary" className="ml-2 text-xs">{submissions.length}</Badge>
+          </button>
+          <button
+            onClick={() => { setTab("dealers"); }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === "dealers" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4 inline mr-1.5" />Dealers
+            <Badge variant="secondary" className="ml-2 text-xs">{dealers.length}</Badge>
+          </button>
+        </div>
+
+        {/* Tab content */}
+        {tab === "submissions" && (
+          <Card className="bg-card/50 border-border">
+            <CardContent className="p-4 md:p-6">
+              <SubmissionsTab
+                submissions={submissions} isLoading={isLoading}
+                search={search} setSearch={setSearch}
+                typeFilter={typeFilter} setTypeFilter={setTypeFilter}
+                sortDir={sortDir} setSortDir={setSortDir}
+                setDeleteTarget={setDeleteTarget} setShipTarget={setShipTarget}
+                onFetchSubmissions={fetchSubmissions}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {tab === "dealers" && (
+          selectedDealer ? (
+            <DealerDetail
+              dealer={selectedDealer}
+              onBack={() => { setSelectedDealer(null); fetchDealers(); }}
+              onUpdate={handleUpdateDealer}
+              onDeleteDealer={handleDeleteDealer}
+              isSaving={isLoading}
+            />
+          ) : (
+            <Card className="bg-card/50 border-border">
+              <CardContent className="p-4 md:p-6">
+                <DealersTab
+                  dealers={dealers} isLoading={isLoading}
+                  onSelect={async (d) => {
+                    const res = await fetch(`/api/admin/dealers/${d.id}`);
+                    const data = await res.json();
+                    if (res.ok) setSelectedDealer(data.data);
+                    else toast({ title: "Error loading dealer", variant: "destructive" });
+                  }}
+                  onAddNew={() => setAddDealerOpen(true)}
+                />
+              </CardContent>
+            </Card>
+          )
+        )}
+      </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Submission?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This will permanently remove the submission from {deleteTarget?.contactName} ({deleteTarget?.email}). This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-secondary text-foreground hover:bg-secondary/80 border-border">Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ShipDialog sub={shipTarget} open={!!shipTarget} onClose={() => setShipTarget(null)} />
+
+      <AddDealerDialog
+        open={addDealerOpen}
+        onClose={() => setAddDealerOpen(false)}
+        onAdd={(d) => { setDealers(prev => [d, ...prev]); setAddDealerOpen(false); }}
+      />
+    </div>
+  );
 }
