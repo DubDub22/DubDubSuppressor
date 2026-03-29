@@ -714,7 +714,7 @@ export default function Home() {
       >
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-20"></div>
         <div className="container mx-auto px-6 max-w-4xl">
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-3 gap-8">
             <motion.div variants={fadeUpItem}>
               <Card className="border-border bg-background/50 backdrop-blur-md p-8 shadow-2xl hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] transition-shadow duration-500 cursor-pointer h-full"
                 onClick={() => window.location.href = '/dealers'}>
@@ -737,6 +737,19 @@ export default function Home() {
                 </p>
                 <Button className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-lg hover:shadow-xl transition-shadow">
                   APPLY NOW
+                </Button>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={fadeUpItem}>
+              <Card className="border-border bg-background/50 backdrop-blur-md p-8 shadow-2xl hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] transition-shadow duration-500 cursor-pointer h-full"
+                onClick={() => window.location.href = '/warranty'}>
+                <h2 className="text-3xl font-bold mb-4">WARRANTY SERVICE</h2>
+                <p className="text-muted-foreground text-lg leading-relaxed mb-6">
+                  Need warranty service? Fill out the form and we&apos;ll get you sorted.
+                </p>
+                <Button className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-lg hover:shadow-xl transition-shadow">
+                  FILE A CLAIM
                 </Button>
               </Card>
             </motion.div>
