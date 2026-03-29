@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown, Wind, Wrench, Feather, Crosshair, UploadCloud } from "lucide-react";
+import DealerMap from "@/components/DealerMap";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -990,6 +991,9 @@ export default function Home() {
       </section>
 
       <div className="h-16 bg-gradient-to-b from-transparent via-background/50 to-transparent pointer-events-none" />
+
+      {/* Dealer Map Section */}
+      <DealerMap />
 
       {/* Dealer Inquiry Section */}
       <motion.section

@@ -461,7 +461,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "fflFileName","fflFileData",
         "taxExempt","taxExemptNotes","salesTaxId",
         "salesTaxFormData","salesTaxFormName",
-        "notes"
+        "notes",
+        "purchased","lastOrderDate"
       ];
       const updates: string[] = [];
       const values: any[] = [];
@@ -605,6 +606,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ ok: true, data: { parsed, rawText: text.slice(0, 500) } });
     } catch (err: any) {
       console.error("parse_sot_error", err);
+      return res.status(500).json({ ok: false, error: "parse_failed" });
+    }
+  });
+
+  // Parse FFL file — extract text from PDF/image and return structured data
+  app.post("/api/admin/dealers/parse-ffl", requireAdmin, async (req, res) => {
+    try {
+      const { fflFileData, fflFileName } = req.body || {};
+      if (!fflFileData) return res.status(400).json({ ok: false, error: "no_file_data" });
+
+      // Decode base64 to temp file
+      const buf = Buffer.from(fflFileData, "base64");
+      const ext = (fflFileName || "").split(".").pop()?.toLowerCase() || "bin";
+      const tmpPath = `/tmp/ffl_parse_${Date.now()}.${ext}`;
+      fs.writeFileSync(tmpPath, buf);
+
+      let text = "";
+
+      if (ext === "pdf") {
+        try {
+          execSync(`pdftoppm -r 150 -png "${tmpPath}" /tmp/ffl_parse_page`, { stdio: "ignore" });
+          const pageImg = glob.sync("/tmp/ffl_parse_page-*.png")[0];
+          if (pageImg) {
+            execSync(`tesseract "${pageImg}" stdout -l eng --psm 6 2>/dev/null > /tmp/ffl_ocr.txt`);
+            text = fs.readFileSync("/tmp/ffl_ocr.txt", "utf8");
+          }
+        } catch {
+          text = "[OCR failed - could not extract text from PDF]";
+        }
+      } else {
+        try {
+          execSync(`tesseract "${tmpPath}" stdout -l eng --psm 6 2>/dev/null > /tmp/ffl_ocr.txt`);
+          text = fs.readFileSync("/tmp/ffl_ocr.txt", "utf8");
+        } catch {
+          text = "[OCR failed]";
+        }
+      }
+
+      // Clean up
+      try { fs.unlinkSync(tmpPath); } catch {}
+      try { fs.unlinkSync("/tmp/ffl_ocr.txt"); } catch {}
+      try { glob.sync("/tmp/ffl_parse_page-*.png").forEach((f: string) => fs.unlinkSync(f)); } catch {}
+
+      // Parse structured fields from OCR text
+      const parsed: Record<string, string> = {};
+      const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean);
+
+      // License number — e.g. "8-654321" or "8-654321-B" (preceded by "License No." or standalone)
+      const licMatch = text.match(/(?:License\s*(?:No\.?|Number|#)\s*:?\s*)([8]-\d{5,}(?:-[A-Z])?)/i)
+        || text.match(/\b(8-\d{5,}(?:-[A-Z])?)\b/);
+      if (licMatch) parsed.fflLicenseNumber = licMatch[1].trim();
+
+      // License type — "Type 01 - Dealer" or "Dealer in Firearms"
+      const typeMatch = text.match(/(?:Type\s*0?\d)\s*[-–]\s*([^\n]+(?:Dealer|Manufacturer|Gunsmith)[^\n]*)/i)
+        || text.match(/(Dealer in Firearms|Manufacturer of Firearms|Gunsmith)/i);
+      if (typeMatch) {
+        const t = typeMatch[1] || typeMatch[0];
+        parsed.fflLicenseType = t.trim().slice(0, 80);
+      }
+
+      // Expiration date — "Expires: 02-28-2027" or "02\/28\/2027"
+      const expMatch = text.match(/(?:Expires?\s*[:]\s*)(0?\d[-/]0?\d[-/]\d{4})/i)
+        || text.match(/\b(0?\d[-/]0?\d[-/]\d{4})\b/);
+      if (expMatch) parsed.fflExpiry = expMatch[1].trim();
+
+      // Business name — usually near the top, often in ALL CAPS or "doing business as"
+      // Look for company name before "License No."
+      const licIdx = lines.findIndex((l: string) =>
+        /license\s*(no\.?|number|#)/i.test(l) || /\b8-\d{5,}/.test(l)
+      );
+      if (licIdx > 0) {
+        // Scan upwards from license line for company name
+        for (let i = licIdx - 1; i >= Math.max(0, licIdx - 5); i--) {
+          const line = lines[i];
+          // Skip obvious address lines and labels
+          if (/^(Street|St|Ave|Rd|Fl|Ste|Suite|Po Box|Box)/i.test(line)) continue;
+          if (/license|ffl|expires|city|state|zip|phone|email/i.test(line)) continue;
+          // CAPS line with some length is likely the name
+          if (/^[A-Z][A-Z\s&\-\.\']+$/.test(line) && line.length > 2) {
+            parsed.businessName = line;
+            break;
+          }
+        }
+      }
+
+      // City/State/Zip — look for "City, ST 12345" pattern near license
+      const addrMatch = text.match(/([A-Za-z\s]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
+      if (addrMatch) {
+        parsed.city = addrMatch[1].trim();
+        parsed.state = addrMatch[2].trim();
+        parsed.zip = addrMatch[3].trim();
+      }
+
+      return res.json({ ok: true, data: { parsed, rawText: text.slice(0, 500) } });
+    } catch (err: any) {
+      console.error("parse_ffl_error", err);
       return res.status(500).json({ ok: false, error: "parse_failed" });
     }
   });
@@ -856,6 +953,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error("warranty_request_error", err?.message || err);
       return res.status(500).json({ ok: false, error: err?.message || "warranty_save_failed" });
+    }
+  });
+
+  // ── Public: Dealer map data ──────────────────────────────────────────────────
+  app.get("/api/dealers/map", async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT id, business_name, city, state, zip, tier, verified
+        FROM dealers
+        WHERE verified = true
+        ORDER BY state, city
+      `);
+      return res.json({ ok: true, data: result.rows });
+    } catch (err: any) {
+      console.error("get_dealers_map_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_fetch" });
+    }
+  });
+
+  // ── Public: Submit retail inquiry ────────────────────────────────────────────
+  app.post("/api/retail-inquiry", async (req, res) => {
+    try {
+      const { dealerId, contactName, email, phone, message } = req.body || {};
+      if (!dealerId || !contactName || !email) {
+        return res.status(400).json({ ok: false, error: "missing_required_fields" });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ ok: false, error: "invalid_email" });
+      }
+
+      const dealerCheck = await pool.query(`SELECT id, business_name FROM dealers WHERE id = $1`, [dealerId]);
+      if (dealerCheck.rows.length === 0) {
+        return res.status(404).json({ ok: false, error: "dealer_not_found" });
+      }
+      const dealer = dealerCheck.rows[0];
+
+      const result = await pool.query(`
+        INSERT INTO retail_inquiries (dealer_id, contact_name, email, phone, message)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `, [dealerId, contactName, email, phone || null, message || null]);
+
+      const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+      if (webhookUrl) {
+        fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: `📍 **New Retail Inquiry**`,
+            embeds: [{
+              title: `Inquiry re: ${dealer.business_name}`,
+              color: 0xFF6600,
+              fields: [
+                { name: "Contact", value: contactName, inline: true },
+                { name: "Email", value: email, inline: true },
+                { name: "Phone", value: phone || "Not provided", inline: true },
+                { name: "Dealer", value: dealer.business_name, inline: true },
+                { name: "Message", value: message || "_No message_" },
+              ],
+              footer: { text: `Inquiry ID: ${result.rows[0].id}` },
+            }]
+          }),
+        }).catch(() => {});
+      }
+
+      return res.json({ ok: true, id: result.rows[0].id });
+    } catch (err: any) {
+      console.error("retail_inquiry_error", err);
+      return res.status(500).json({ ok: false, error: "server_error" });
     }
   });
 

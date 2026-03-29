@@ -84,6 +84,8 @@ type Dealer = {
   salesTaxFormName?: string;
   notes?: string;
   sourceSubmissionId?: string;
+  purchased?: boolean;
+  lastOrderDate?: string;
   createdAt: string;
   updatedAt: string;
   orderCount?: number;
@@ -121,6 +123,8 @@ const dealerFormSchema = z.object({
   taxExemptNotes: z.string().optional(),
   salesTaxId: z.string().optional(),
   notes: z.string().optional(),
+  purchased: z.boolean().optional(),
+  lastOrderDate: z.string().optional(),
 });
 type DealerFormValues = z.infer<typeof dealerFormSchema>;
 
@@ -1105,6 +1109,28 @@ function DealerDetail({
 
                 {/* Notes */}
                 <div className="border-t border-border pt-4">
+                  {/* Order status */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <FormField control={form.control} name="purchased"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border p-3">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-sm">Has Purchased</FormLabel>
+                            <p className="text-xs text-muted-foreground">Dealer has placed an order</p>
+                          </div>
+                          <FormControl>
+                            <input type="checkbox" checked={field.value ?? false}
+                              onChange={field.onChange} className="accent-primary w-5 h-5 cursor-pointer" />
+                          </FormControl>
+                        </FormItem>
+                      )} />
+                    <FormField control={form.control} name="lastOrderDate"
+                      render={({ field }) => (
+                        <FormItem><FormLabel>Last Order Date</FormLabel>
+                          <FormControl><Input type="date" {...field} className="bg-background" /></FormControl>
+                          <FormMessage /></FormItem>
+                      )} />
+                  </div>
                   <FormField control={form.control} name="notes"
                     render={({ field }) => (
                       <FormItem><FormLabel>Internal Notes</FormLabel>
