@@ -407,7 +407,7 @@ export default function Home() {
             <Button
               variant="outline"
               className="border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground font-display uppercase tracking-wide cursor-pointer"
-              onClick={() => scrollToSection('contact')}
+              onClick={() => window.location.href = '/dealers'}
             >
               Dealer Inquiries
             </Button>
