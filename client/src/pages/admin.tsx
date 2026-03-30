@@ -2048,7 +2048,7 @@ export default function AdminPage() {
               tab === "submissions" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Inbox className="w-4 h-4 inline mr-1.5" />Submissions
+            <Inbox className="w-4 h-4 inline mr-1.5" />Orders
             <Badge variant="secondary" className="ml-2 text-xs">{submissions.length}</Badge>
           </button>
           <button
