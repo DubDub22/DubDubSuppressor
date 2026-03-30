@@ -120,12 +120,19 @@ export default function DealerMap() {
   const [submitting, setSubmitting] = useState(false);
   const [nearestPreferred, setNearestPreferred] = useState<(Dealer & { _dist: number }) | null>(null);
 
-  // Build lat/lng from DB coords
+  // Build lat/lng from DB coords, jitter duplicate pins so they spread on the map
   const mappableDealers = useMemo(() => {
+    const seen: Record<string, number> = {};
     return dealers
       .map(d => {
         if (d.lat != null && d.lng != null) {
-          return { ...d, _latlng: [d.lat, d.lng] as [number, number] };
+          const key = `${d.lat.toFixed(4)},${d.lng.toFixed(4)}`;
+          const jitter = seen[key] || 0;
+          seen[key] = jitter + 1;
+          // Add ~50-150m jitter for duplicates (0.0005-0.0015 degrees)
+          const jitterLat = jitter > 0 ? d.lat + (Math.random() * 0.001 + 0.0005) * (jitter % 2 === 0 ? 1 : -1) : d.lat;
+          const jitterLng = jitter > 0 ? d.lng + (Math.random() * 0.001 + 0.0005) * (jitter % 2 === 0 ? 1 : -1) : d.lng;
+          return { ...d, _latlng: [jitterLat, jitterLng] as [number, number] };
         }
         return null;
       })
