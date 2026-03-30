@@ -10,6 +10,7 @@ import DealersPage from "@/pages/dealers";
 import ApplyPage from "@/pages/apply";
 import WarrantyPage from "@/pages/warranty";
 import AdminPage from "@/pages/admin";
+import OrderPage from "@/pages/order";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/dealers" component={DealersPage} />
       <Route path="/apply" component={ApplyPage} />
       <Route path="/warranty" component={WarrantyPage} />
+      <Route path="/order" component={OrderPage} />
       <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>

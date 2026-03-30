@@ -1085,6 +1085,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Public: Unified Retail Order / Inquiry ─────────────────────────────────
+  app.post("/api/retail-order", async (req, res) => {
+    try {
+      const {
+        intent, contactName, email, phone,
+        message, quantity, fflFileName, fflFileData
+      } = req.body || {};
+
+      if (!contactName || !email) {
+        return res.status(400).json({ ok: false, error: "missing_required_fields" });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ ok: false, error: "invalid_email" });
+      }
+
+      const isInfo = intent === "info";
+      const isDemo = intent === "demo";
+      const qty = isInfo ? null : isDemo ? "1" : quantity;
+
+      // Validate quantity for order intents
+      if (!isInfo && qty) {
+        const numQty = parseInt(qty, 10);
+        if (isNaN(numQty) || numQty < 1 || numQty > 20) {
+          return res.status(400).json({ ok: false, error: "quantity_must_be_1_to_20" });
+        }
+      }
+
+      const subjectLine = isInfo
+        ? "Retail Inquiry"
+        : isDemo
+        ? "Retail Order (Demo Can)"
+        : `Retail Order — ${qty} cans`;
+
+      const bodyLines = [
+        `DubDub22 ${subjectLine}`,
+        "",
+        `Contact: ${contactName}`,
+        `Email: ${email}`,
+        phone ? `Phone: ${phone}` : null,
+        !isInfo && qty ? `Quantity: ${qty}` : null,
+        message ? `\nMessage:\n${message}` : null,
+        fflFileName && !isInfo ? `\nSOT File: ${fflFileName}` : null,
+      ].filter(Boolean);
+
+      const ext = (fflFileName || "").split(".").pop()?.toLowerCase() || "";
+      const contentTypeMap: Record<string, string> = {
+        pdf: "application/pdf",
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+      };
+
+      // Send email
+      await sendViaGmail({
+        to: SALES_EMAIL,
+        bcc: BCC_EMAIL,
+        subject: `DubDub22 ${subjectLine}`,
+        text: bodyLines.join("\n"),
+        replyTo: email,
+        attachment: fflFileData && !isInfo ? {
+          filename: fflFileName || "sot-file",
+          base64Data: fflFileData,
+          contentType: contentTypeMap[ext] || "application/octet-stream",
+        } : undefined,
+      }).catch(err => {
+        console.error("retail_order_gmail_error", err);
+        // Don't fail the whole request if email fails
+      });
+
+      // Post Discord webhook
+      const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+      if (webhookUrl) {
+        fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: isInfo
+              ? `💬 **New Retail Inquiry — ${contactName}**`
+              : `🛒 **New Retail Order — ${contactName}**`,
+            embeds: [{
+              title: subjectLine,
+              color: isInfo ? 0x666666 : 0xFF6600,
+              fields: [
+                { name: "Contact", value: contactName, inline: true },
+                { name: "Email", value: email, inline: true },
+                { name: "Phone", value: phone || "Not provided", inline: true },
+                ...(qty ? [{ name: "Quantity", value: qty, inline: true }] : []),
+                ...(message ? [{ name: "Message", value: message }] : []),
+              ],
+            }]
+          }),
+        }).catch(() => {});
+      }
+
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("retail_order_error", err);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
+
   // ── Public: Submit retail inquiry ────────────────────────────────────────────
   app.post("/api/retail-inquiry", async (req, res) => {
     try {
