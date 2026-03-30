@@ -7,7 +7,7 @@ import {
   Copy, Image as ImageIcon, Download, Trash2, Package,
   ChevronRight, ArrowLeft, Building2, FileText,
   Upload, Eye, X, Search, Users, Inbox,
-  MessageSquare, ShieldCheck
+  MessageSquare, ShieldCheck, Phone
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,7 @@ type Dealer = {
   submissions?: Submission[];
 };
 
-type Tab = "submissions" | "dealers" | "retail_inquiries" | "warranty";
+type Tab = "submissions" | "dealers" | "retail_inquiries" | "warranty" | "dealer_inquiries";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
@@ -1837,6 +1837,82 @@ function WarrantyTab({
   );
 }
 
+function DealerInquiriesTab({
+  submissions, search, setSearch
+}: {
+  submissions: Submission[];
+  search: string;
+  setSearch: (s: string) => void;
+}) {
+  const filtered = submissions.filter((sub) => {
+    if (search) {
+      const q = search.toLowerCase();
+      const s = `${fmtDate(sub.createdAt)} ${sub.contactName} ${sub.businessName} ${sub.email} ${sub.phone}`.toLowerCase();
+      if (!s.includes(q)) return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input
+          placeholder="Search dealer inquiries..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="sm:max-w-xs bg-background h-9"
+        />
+      </div>
+
+      <div className="block md:hidden space-y-3">
+        {filtered.length === 0 ? <p className="text-center py-8 text-muted-foreground">No dealer inquiries.</p>
+          : filtered.map(sub => (
+            <div key={sub.id} className="border border-border rounded-lg p-3 bg-card">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500 text-white">LEAD</span>
+                  <span className="text-xs text-muted-foreground font-mono">{fmtDate(sub.createdAt)}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{sub.businessName || "—"}</p>
+                <p className="text-xs text-muted-foreground">{sub.contactName || "—"}</p>
+                <p className="text-xs text-muted-foreground">{sub.email || "—"}</p>
+                {sub.phone && <p className="text-xs text-muted-foreground">{sub.phone}</p>}
+              </div>
+            </div>
+          ))}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-xs text-muted-foreground uppercase bg-secondary/30">
+            <tr>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Business</th>
+              <th className="px-3 py-2">Contact</th>
+              <th className="px-3 py-2">Email</th>
+              <th className="px-3 py-2">Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No dealer inquiries found.</td></tr>
+              : filtered.map(sub => (
+                <tr key={sub.id} className="border-b border-border hover:bg-secondary/10">
+                  <td className="px-3 py-2 text-muted-foreground font-mono text-xs">{fmtDate(sub.createdAt)}</td>
+                  <td className="px-3 py-2 font-medium">{sub.businessName || "—"}</td>
+                  <td className="px-3 py-2">{sub.contactName || "—"}</td>
+                  <td className="px-3 py-2">{sub.email || "—"}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{sub.phone || "—"}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Main AdminPage ─────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -1859,6 +1935,8 @@ export default function AdminPage() {
   const [retailStatus, setRetailStatus] = useState("all");
   const [warrantySearch, setWarrantySearch] = useState("");
   const [warrantyStatus, setWarrantyStatus] = useState("all");
+  const [dealerInquiries, setDealerInquiries] = useState<Submission[]>([]);
+  const [dealerInquiriesSearch, setDealerInquiriesSearch] = useState("");
 
   const pinForm = useForm<z.infer<typeof pinSchema>>({ resolver: zodResolver(pinSchema), defaultValues: { pin: "" } });
 
@@ -1920,6 +1998,11 @@ export default function AdminPage() {
       .catch(() => { if (!cancelled) setAuthStatus("needs_pin"); });
     return () => { cancelled = true; };
   }, [fetchSubmissions, fetchDealers]);
+
+  // Derive dealer inquiries (leads) from submissions — type=dealer but hasn't ordered a demo
+  useEffect(() => {
+    setDealerInquiries(submissions.filter(s => s.type === "dealer" && s.hasOrderedDemo === "false"));
+  }, [submissions]);
 
   const onRequestPin = async () => {
     try {
@@ -2078,6 +2161,15 @@ export default function AdminPage() {
             <ShieldCheck className="w-4 h-4 inline mr-1.5" />Warranty
             <Badge variant="secondary" className="ml-2 text-xs">{warrantyRequests.length}</Badge>
           </button>
+          <button
+            onClick={() => { setTab("dealer_inquiries"); }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              tab === "dealer_inquiries" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Phone className="w-4 h-4 inline mr-1.5" />Dealer Inquiries
+            <Badge variant="secondary" className="ml-2 text-xs">{dealerInquiries.length}</Badge>
+          </button>
         </div>
 
         {/* Tab content */}
@@ -2148,6 +2240,18 @@ export default function AdminPage() {
                 statusFilter={warrantyStatus}
                 setStatusFilter={setWarrantyStatus}
                 onRefresh={fetchWarrantyRequests}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {tab === "dealer_inquiries" && (
+          <Card className="bg-card/50 border-border">
+            <CardContent className="p-4 md:p-6">
+              <DealerInquiriesTab
+                submissions={dealerInquiries}
+                search={dealerInquiriesSearch}
+                setSearch={setDealerInquiriesSearch}
               />
             </CardContent>
           </Card>
