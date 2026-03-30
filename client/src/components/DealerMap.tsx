@@ -301,7 +301,7 @@ export default function DealerMap() {
       {!loading && dealers.length > 0 && (
         <div className="mt-6 space-y-3">
           {/* Featured: nearest Preferred dealer */}
-          {nearestPreferred && nearestPreferred.id !== dealers[0]?.id && (
+          {nearestPreferred && nearestPreferred.id === dealers[0]?.id && (
             <Card className="bg-primary/5 border-primary/30 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
