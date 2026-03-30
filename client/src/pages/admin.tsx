@@ -1967,24 +1967,6 @@ export default function AdminPage() {
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/admin/check-auth")
-      .then(res => res.json())
-      .then(data => {
-        if (cancelled) return;
-        if (data.authorized) {
-          fetchSubmissions();
-          fetchWarrantyRequests();
-          fetchDealerInquiries();
-          setAuthStatus("authorized");
-        }
-        else setAuthStatus("needs_pin");
-      })
-      .catch(() => { if (!cancelled) setAuthStatus("needs_pin"); });
-    return () => { cancelled = true; };
-  }, [fetchSubmissions, fetchWarrantyRequests, fetchDealerInquiries]);
-
   const fetchDealerInquiries = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/dealer-inquiries");
@@ -2009,6 +1991,24 @@ export default function AdminPage() {
   useEffect(() => {
     fetchDealerInquiries();
   }, [fetchDealerInquiries]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/check-auth")
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data.authorized) {
+          fetchSubmissions();
+          fetchWarrantyRequests();
+          fetchDealerInquiries();
+          setAuthStatus("authorized");
+        }
+        else setAuthStatus("needs_pin");
+      })
+      .catch(() => { if (!cancelled) setAuthStatus("needs_pin"); });
+    return () => { cancelled = true; };
+  }, [fetchSubmissions, fetchWarrantyRequests, fetchDealerInquiries]);
 
   const onRequestPin = async () => {
     try {
