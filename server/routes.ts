@@ -6,6 +6,7 @@ import { globSync } from "glob";
 import path from "path";
 import session from "express-session";
 import { storage } from "./storage";
+import { uploadDealerDocuments } from "./sftp-upload";
 import { pool } from "./db";
 import { loadFFLMaster, validateFFL } from "./ffl-master";
 
@@ -732,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/dealers/export/:source", requireAdmin, async (req, res) => {
     try {
       const { source } = req.params; // rebel, web_form, manual
-      const allowed = ["rebel", "web_form", "manual"];
+      const allowed = ["rebel_dealer_list", "web_form", "manual"];
       if (!allowed.includes(source)) {
         return res.status(400).json({ ok: false, error: "Invalid source. Use: rebel, web_form, manual" });
       }
@@ -1181,6 +1182,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
            ON CONFLICT DO NOTHING`,
           [dealerId, submissionId, orderType, quantityCans ? String(quantityCans) : null]
         ).catch(err => console.error("dealer_submission_link_failed", err));
+      }
+
+      // Upload documents to 3dprintmanager via SFTP (non-blocking)
+      if (!isInquiry && fflNumber && (fflFileData || sotFileData)) {
+        uploadDealerDocuments(fflNumber, { fflFileData, fflFileName, sotFileData, sotFileName }).catch(err =>
+          console.error("sftp_upload_dealer_docs_error", err)
+        );
       }
 
       return res.json({ ok: true, id: submissionId || "unknown" });
