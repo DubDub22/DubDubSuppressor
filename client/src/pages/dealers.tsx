@@ -7,14 +7,11 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 function formatFFL(value: string): string {
-  const digits = value.replace(/[^0-9A-Za-z]/gi, "").toUpperCase().slice(0, 15);
-  // Format: XX-XXX-XX-XX-XXXXX
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
-  if (digits.length <= 8) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
-  if (digits.length <= 10) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7)}`;
-  if (digits.length <= 13) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7, 9)}-${digits.slice(9)}`;
-  return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7, 9)}-${digits.slice(9, 15)}`;
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  // Format: X-XX-XXXXX (8 digits)
+  if (digits.length <= 1) return digits;
+  if (digits.length <= 3) return `${digits.slice(0, 1)}-${digits.slice(1)}`;
+  return `${digits.slice(0, 1)}-${digits.slice(1, 3)}-${digits.slice(3)}`;
 }
 
 export default function DealersPage() {
@@ -25,8 +22,8 @@ export default function DealersPage() {
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
-    if (ffl.replace(/\D/g, "").length !== 9) {
-      toast({ title: "Invalid FFL", description: "FFL must be 9 digits (e.g. X-XX-XXXXX)", variant: "destructive" });
+    if (ffl.replace(/\D/g, "").length !== 8) {
+      toast({ title: "Invalid FFL", description: "FFL must be 8 digits (e.g. X-XX-XXXXX)", variant: "destructive" });
       return;
     }
     setStatus("checking");
@@ -89,19 +86,19 @@ export default function DealersPage() {
               </label>
               <Input
                 id="ffl-input"
-                placeholder="01-066-003-07-7J-00459"
+                placeholder="1-23-45678"
                 value={ffl}
                 onChange={(e) => setFfl(formatFFL(e.target.value))}
                 className="text-center text-2xl tracking-widest font-mono bg-card border-border focus:border-primary h-14"
-                maxLength={21}
+                maxLength={11}
                 autoFocus
               />
-              <p className="text-xs text-muted-foreground">Format: 1-23456 or X-XX-XXXXX</p>
+              <p className="text-xs text-muted-foreground">Format: X-XX-XXXXX (8 digits)</p>
             </div>
 
             <Button
               type="submit"
-              disabled={status === "checking" || ffl.replace(/\D/g, "").length < 9}
+              disabled={status === "checking" || ffl.replace(/\D/g, "").length < 8}
               className="w-full font-display text-lg h-14 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-lg"
             >
               {status === "checking" ? (
