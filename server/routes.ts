@@ -908,12 +908,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check against verified dealers table first
       const dealer = await pool.query(
-        `SELECT id, business_name, verified FROM dealers WHERE UPPER(REPLACE(REPLACE(ffl_license_number, '-', ''), ' ', '')) = $1`,
+        `SELECT id, business_name, verified, ffl_license_number, ffl_expiry, contact_name, email, phone, ein
+         FROM dealers WHERE UPPER(REPLACE(REPLACE(ffl_license_number, '-', ''), ' ', '')) = $1`,
         [normalized]
       );
 
       if (dealer.rows.length > 0 && dealer.rows[0].verified) {
-        return res.json({ ok: true, valid: true, dealerName: dealer.rows[0].business_name });
+        return res.json({
+          ok: true,
+          valid: true,
+          dealerName: dealer.rows[0].business_name,
+          fromDealersTable: true,
+          fflLicenseNumber: dealer.rows[0].ffl_license_number,
+          fflExpiry: dealer.rows[0].ffl_expiry,
+          contactName: dealer.rows[0].contact_name,
+          email: dealer.rows[0].email,
+          phone: dealer.rows[0].phone,
+          ein: dealer.rows[0].ein,
+        });
       }
 
       // Check against MASTER FFL CSV

@@ -17,7 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 const dealerApplySchema = z.object({
   dealerName: z.string().min(2, "Dealer / FFL name is required"),
   contactName: z.string().min(2, "Contact name is required"),
+  email: z.string().email("Valid email is required"),
   fflNumber: z.string().min(9, "Valid FFL number is required"),
+  fflExpiry: z.string().optional(),
   ein: z.string().optional(),
   message: z.string().optional(),
 });
@@ -205,7 +207,7 @@ function PendingUpload(props: { fflNumber: string }) {
 
 // ─── Dealer Form (verified FFL — place order or inquiry) ───────────────────────
 
-function DealerForm(props: { fflNumber: string; dealerName?: string }) {
+function DealerForm(props: { fflNumber: string; dealerName?: string; email?: string; expiry?: string }) {
   const { toast } = useToast();
   const [orderKind, setOrderKind] = useState<"inquiry" | "demo" | "stocking">("inquiry");
   const [quantityCans, setQuantityCans] = useState("5");
@@ -217,7 +219,9 @@ function DealerForm(props: { fflNumber: string; dealerName?: string }) {
     defaultValues: {
       dealerName: props.dealerName || "",
       contactName: "",
+      email: props.email || "",
       fflNumber: props.fflNumber,
+      fflExpiry: props.expiry || "",
       ein: "",
       message: "",
     },
@@ -385,7 +389,7 @@ function DealerForm(props: { fflNumber: string; dealerName?: string }) {
           />
         </div>
 
-        {/* ── FFL / EIN ── */}
+        {/* ── FFL / EIN / Email / Expiry ── */}
         <div className="grid md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -395,6 +399,37 @@ function DealerForm(props: { fflNumber: string; dealerName?: string }) {
                 <FormLabel>FFL Number</FormLabel>
                 <FormControl>
                   <Input {...field} readOnly className="bg-card border-border font-mono" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="fflExpiry"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  FFL Expiration Date <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+                </FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="MM/DD/YYYY" className="bg-card border-border" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Contact Email</FormLabel>
+                <FormControl>
+                  <Input {...field} type="email" placeholder="dealer@example.com" className="bg-card border-border" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -507,6 +542,7 @@ export default function ApplyPage() {
   const [params] = useSearchParams();
   const ffl = params.get("ffl") || "";
   const dealerName = params.get("name") || "";
+  const expiry = params.get("expiry") || "";
   const pending = params.get("pending") === "1";
 
   if (!ffl) {
@@ -552,7 +588,7 @@ export default function ApplyPage() {
             {pending ? (
               <PendingUpload fflNumber={ffl} />
             ) : (
-              <DealerForm fflNumber={ffl} dealerName={dealerName} />
+              <DealerForm fflNumber={ffl} dealerName={dealerName} expiry={expiry} />
             )}
           </motion.div>
         </div>

@@ -37,9 +37,11 @@ export default function DealersPage() {
       if (data.valid) {
         setDealerName(data.dealerName || "");
         setStatus("success");
-        // Redirect to portal after brief display
+        // Redirect to portal after brief display — pass full FFL + expiry from DB
         setTimeout(() => {
-          window.location.href = `/apply?ffl=${encodeURIComponent(ffl)}&name=${encodeURIComponent(data.dealerName || "")}`;
+          const fullFfl = data.fflLicenseNumber || ffl;
+          const expiry = data.fflExpiry || "";
+          window.location.href = `/apply?ffl=${encodeURIComponent(fullFfl)}&name=${encodeURIComponent(data.dealerName || "")}&expiry=${encodeURIComponent(expiry)}`;
         }, 1500);
       } else {
         setStatus("not-found");
