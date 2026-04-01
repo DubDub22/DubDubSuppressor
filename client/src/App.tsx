@@ -13,6 +13,7 @@ import ApplyPage from "@/pages/apply";
 import WarrantyPage from "@/pages/warranty";
 import AdminPage from "@/pages/admin";
 import OrderPage from "@/pages/order";
+import OrderConfirmationPage from "@/pages/order-confirmation";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/apply" component={ApplyPage} />
       <Route path="/warranty" component={WarrantyPage} />
       <Route path="/order" component={OrderPage} />
+      <Route path="/order-confirmation" component={OrderConfirmationPage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/upload-tax-form" component={UploadTaxFormPage} />
       <Route component={NotFound} />
