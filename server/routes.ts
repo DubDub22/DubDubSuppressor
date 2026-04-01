@@ -1585,6 +1585,303 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  // TAX FORM UPLOAD & REVIEW
+  // ═══════════════════════════════════════════════════════════════════
+
+  // Generate a tax form upload token and email the link to the dealer
+  app.post("/api/tax-form/send-upload-link", requireAdmin, async (req, res) => {
+    try {
+      const { dealerId, submissionId, fflNumber } = req.body || {};
+      if (!dealerId || !fflNumber) {
+        return res.status(400).json({ ok: false, error: "dealer_id_and_ffl_required" });
+      }
+
+      // Look up dealer email
+      const dealerResult = await pool.query(
+        `SELECT email, business_name, contact_name FROM dealers WHERE id = $1`,
+        [dealerId]
+      );
+      if (!dealerResult.rows.length) {
+        return res.status(404).json({ ok: false, error: "dealer_not_found" });
+      }
+      const dealer = dealerResult.rows[0];
+
+      // Check if a pending/uploaded record already exists for this dealer
+      const existing = await pool.query(
+        `SELECT id, token FROM dealer_tax_forms
+         WHERE dealer_id = $1 AND status IN ('pending', 'uploaded')
+         ORDER BY created_at DESC LIMIT 1`,
+        [dealerId]
+      );
+
+      let token: string;
+      if (existing.rows.length > 0) {
+        token = existing.rows[0].token;
+      } else {
+        // Generate new token
+        const tokenResult = await pool.query(
+          `INSERT INTO dealer_tax_forms (dealer_id, submission_id, ffl_number, token, status)
+           VALUES ($1, $2, $3, gen_random_uuid(), 'pending')
+           RETURNING token`,
+          [dealerId, submissionId || null, fflNumber]
+        );
+        token = tokenResult.rows[0].token;
+      }
+
+      const uploadUrl = `https://dubdub22.com/upload-tax-form?token=${token}`;
+
+      // Send email to dealer
+      await sendViaGmail({
+        to: dealer.email,
+        subject: `Action Required — DubDub22 Tax Form Upload`,
+        text: [
+          `Hi ${dealer.contact_name || dealer.business_name},`,
+          ``,
+          `We're ready to process your DubDub22 order and need a copy of your Multi-State Tax Form (or your Certificate of Resale).`,
+          ``,
+          `Please upload your completed form using the link below:`,
+          ``,
+          `${uploadUrl}`,
+          ``,
+          `If you have any questions, reach us at info@dubdub22.com.`,
+          ``,
+          `— DubDub22 Minions`,
+        ].join("\n"),
+        replyTo: SALES_EMAIL,
+      });
+
+      return res.json({ ok: true, token, uploadUrl });
+    } catch (err: any) {
+      console.error("tax_form_send_upload_link_error", err);
+      return res.status(500).json({ ok: false, error: err?.message || "server_error" });
+    }
+  });
+
+  // Public: Upload a tax form using a token (no auth required)
+  app.post("/api/tax-form/upload", async (req, res) => {
+    try {
+      const { token, taxFormFileName, taxFormFileData } = req.body || {};
+      if (!token || !taxFormFileName || !taxFormFileData) {
+        return res.status(400).json({ ok: false, error: "missing_required_fields" });
+      }
+
+      // Validate token
+      const tokenResult = await pool.query(
+        `SELECT id, dealer_id, ffl_number, status FROM dealer_tax_forms WHERE token = $1`,
+        [token]
+      );
+      if (!tokenResult.rows.length) {
+        return res.status(404).json({ ok: false, error: "invalid_token" });
+      }
+      const record = tokenResult.rows[0];
+      if (record.status === "accepted") {
+        return res.status(400).json({ ok: false, error: "form_already_accepted" });
+      }
+      if (record.status === "uploaded") {
+        // Allow re-upload — just overwrite
+      }
+
+      const ext = taxFormFileName.split(".").pop()?.toLowerCase() || "pdf";
+      await pool.query(
+        `UPDATE dealer_tax_forms
+         SET file_name = $1, file_data = $2, status = 'uploaded', uploaded_at = NOW()
+         WHERE token = $3`,
+        [`${taxFormFileName.replace(/\.[^.]+$/, "")}_${Date.now()}.${ext}`, taxFormFileData, token]
+      );
+
+      // Update dealer's tax_form_status
+      await pool.query(
+        `UPDATE dealers SET tax_form_status = 'uploaded' WHERE id = $1`,
+        [record.dealer_id]
+      );
+
+      return res.json({ ok: true, message: "Tax form uploaded successfully." });
+    } catch (err: any) {
+      console.error("tax_form_upload_error", err);
+      return res.status(500).json({ ok: false, error: err?.message || "server_error" });
+    }
+  });
+
+  // Admin: List all tax form records
+  app.get("/api/admin/tax-forms", requireAdmin, async (req, res) => {
+    try {
+      const { status } = req.query;
+      let query = `
+        SELECT dtf.*, d.business_name as dealer_name, d.contact_name as dealer_contact,
+               d.email as dealer_email, d.ffl_license_number, d.tax_form_status
+        FROM dealer_tax_forms dtf
+        JOIN dealers d ON dtf.dealer_id = d.id
+        WHERE 1=1
+      `;
+      const params: any[] = [];
+      if (status && status !== "all") {
+        query += ` AND dtf.status = $1`;
+        params.push(status);
+      }
+      query += ` ORDER BY dtf.created_at DESC`;
+      const result = await pool.query(query, params);
+      return res.json({ ok: true, data: result.rows });
+    } catch (err: any) {
+      console.error("admin_tax_forms_error", err);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
+
+  // Admin: Get single tax form record (includes file data)
+  app.get("/api/admin/tax-forms/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await pool.query(
+        `SELECT dtf.*, d.business_name as dealer_name, d.contact_name as dealer_contact,
+                d.email as dealer_email, d.ffl_license_number, d.tax_form_status
+         FROM dealer_tax_forms dtf
+         JOIN dealers d ON dtf.dealer_id = d.id
+         WHERE dtf.id = $1`,
+        [id]
+      );
+      if (!result.rows.length) return res.status(404).json({ ok: false, error: "not_found" });
+      return res.json({ ok: true, data: result.rows[0] });
+    } catch (err: any) {
+      console.error("admin_tax_form_get_error", err);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
+
+  // Admin: Accept a tax form
+  app.post("/api/admin/tax-forms/:id/accept", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const recordResult = await pool.query(
+        `SELECT dtf.*, d.ffl_license_number, d.tax_form_status
+         FROM dealer_tax_forms dtf JOIN dealers d ON dtf.dealer_id = d.id
+         WHERE dtf.id = $1`,
+        [id]
+      );
+      if (!recordResult.rows.length) return res.status(404).json({ ok: false, error: "not_found" });
+      const record = recordResult.rows[0];
+      if (record.status === "accepted") {
+        return res.status(400).json({ ok: false, error: "already_accepted" });
+      }
+
+      const ext = (record.file_name || "pdf").split(".").pop()?.toLowerCase() || "pdf";
+      const fflDigits = (record.ffl_license_number || record.ffl_number || "").replace(/-/g, "");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const remoteName = `Tax_${dateStr}_${fflDigits}.${ext}`;
+      const folderName = fflDigits; // matches fflToFolderName logic
+
+      // Upload to 3dprintmanager via direct SFTP with correct naming
+      if (record.file_data) {
+        const { sftpUpload } = await import("./sftp-upload");
+        const remotePath = `/home/dealer-uploader/dealer-docs/${folderName}/${remoteName}`;
+        await sftpUpload(
+          Buffer.from(record.file_data, "base64"),
+          remotePath
+        ).catch(err => {
+          console.error("sftp_upload_tax_form_error", err);
+          throw err;
+        });
+      }
+
+      // Update status
+      await pool.query(
+        `UPDATE dealer_tax_forms SET status = 'accepted', reviewed_at = NOW() WHERE id = $1`,
+        [id]
+      );
+      await pool.query(
+        `UPDATE dealers SET tax_form_status = 'accepted' WHERE id = $1`,
+        [record.dealer_id]
+      );
+
+      // Post Discord notification
+      const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+      if (webhookUrl) {
+        fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: `✅ **Tax Form Accepted** — ${record.dealer_name} (FFL: ${record.ffl_license_number || record.ffl_number})`,
+            embeds: [{
+              color: 0x22c55e,
+              fields: [
+                { name: "Dealer", value: record.dealer_name, inline: true },
+                { name: "FFL", value: record.ffl_license_number || record.ffl_number || "—", inline: true },
+                { name: "File", value: remoteName },
+              ]
+            }]
+          }),
+        }).catch(() => {});
+      }
+
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("tax_form_accept_error", err);
+      return res.status(500).json({ ok: false, error: err?.message || "server_error" });
+    }
+  });
+
+  // Admin: Deny a tax form
+  app.post("/api/admin/tax-forms/:id/deny", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body || {};
+
+      const recordResult = await pool.query(
+        `SELECT dtf.*, d.business_name, d.contact_name, d.email, d.ffl_license_number
+         FROM dealer_tax_forms dtf JOIN dealers d ON dtf.dealer_id = d.id
+         WHERE dtf.id = $1`,
+        [id]
+      );
+      if (!recordResult.rows.length) return res.status(404).json({ ok: false, error: "not_found" });
+      const record = recordResult.rows[0];
+      if (record.status === "accepted") {
+        return res.status(400).json({ ok: false, error: "cannot_deny_accepted_form" });
+      }
+
+      // Generate a fresh upload token so dealer can re-upload
+      const newTokenResult = await pool.query(
+        `UPDATE dealer_tax_forms
+         SET token = gen_random_uuid(), status = 'pending', denial_sent = true, denial_email_sent_at = NOW()
+         WHERE id = $1
+         RETURNING token`,
+        [id]
+      );
+      const newToken = newTokenResult.rows[0].token;
+      const uploadUrl = `https://dubdub22.com/upload-tax-form?token=${newToken}`;
+
+      // Send denial email
+      await sendViaGmail({
+        to: record.email,
+        subject: `Action Required — DubDub22 Tax Form Update`,
+        text: [
+          `Hi ${record.contact_name || record.business_name},`,
+          ``,
+          `Thanks for submitting your Multi-State Tax Form! We reviewed it and need a few changes before we can accept it.`,
+          ``,
+          reason ? `Reason: ${reason}` : null,
+          ``,
+          `Please review the form linked below and upload a corrected version. If you have questions, feel free to email us directly at info@dubdub22.com.`,
+          ``,
+          `${uploadUrl}`,
+          ``,
+          `— DubDub22 Minions`,
+        ].filter(Boolean).join("\n"),
+        replyTo: SALES_EMAIL,
+      });
+
+      await pool.query(
+        `UPDATE dealers SET tax_form_status = 'denied' WHERE id = $1`,
+        [record.dealer_id]
+      );
+
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("tax_form_deny_error", err);
+      return res.status(500).json({ ok: false, error: err?.message || "server_error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -11,7 +11,7 @@ const SFTP_KEY_PATH = "/root/.ssh/id_ed25519";
  * Upload a file buffer to a remote SFTP server.
  * Creates the target directory if it doesn't exist.
  */
-function sftpUpload(
+export function sftpUpload(
   buffer: Buffer,
   remotePath: string
 ): Promise<void> {
