@@ -1066,29 +1066,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dealer-request/demo-status", async (req, res) => {
     const { email } = req.query;
     if (!email || typeof email !== "string") {
-      return res.json({ hasShippedDemo: false });
+      return res.json({ hasShippedDemo: false, demoFulfilledAt: null });
     }
     try {
-      // Check submissions table first
+      // Check submissions table first (has_ordered_demo = true)
       const sub = await pool.query(
-        `SELECT 1 FROM submissions WHERE email = $1 AND has_ordered_demo = 'true' AND type = 'dealer' LIMIT 1`,
+        `SELECT created_at FROM submissions WHERE email = $1 AND has_ordered_demo = 'true' AND type = 'dealer' ORDER BY created_at DESC LIMIT 1`,
         [email]
       );
       if (sub.rows.length > 0) {
-        return res.json({ hasShippedDemo: true });
+        return res.json({ hasShippedDemo: true, demoFulfilledAt: sub.rows[0].created_at });
       }
       // Also check dealer_orders for shipped demo samples
-      // Match by email via dealers table
       const dealerOrder = await pool.query(
-        `SELECT 1 FROM dealer_orders o
+        `SELECT o.created_at FROM dealer_orders o
          JOIN dealers d ON o.dealer_id::text = d.id::text
          WHERE d.email = $1 AND o.is_dealer_sample = true AND o.status = 'shipped'
-         LIMIT 1`,
+         ORDER BY o.created_at DESC LIMIT 1`,
         [email]
       );
-      return res.json({ hasShippedDemo: dealerOrder.rows.length > 0 });
+      if (dealerOrder.rows.length > 0) {
+        return res.json({ hasShippedDemo: true, demoFulfilledAt: dealerOrder.rows[0].created_at });
+      }
+      return res.json({ hasShippedDemo: false, demoFulfilledAt: null });
     } catch {
-      return res.json({ hasShippedDemo: false });
+      return res.json({ hasShippedDemo: false, demoFulfilledAt: null });
     }
   });
 

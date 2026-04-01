@@ -142,6 +142,7 @@ export default function DealerForm() {
   });
 
   // Check if dealer already has a shipped demo when email looks valid
+  const [demoFulfilledAt, setDemoFulfilledAt] = useState<string | null>(null);
   const checkDemoStatus = async (email: string) => {
     if (!email.includes("@") || !email.includes(".")) return;
     setCheckingDemo(true);
@@ -149,6 +150,7 @@ export default function DealerForm() {
       const resp = await fetch(`/api/dealer-request/demo-status?email=${encodeURIComponent(email)}`);
       const data = await resp.json();
       setDemoFulfilled(!!data.hasShippedDemo);
+      setDemoFulfilledAt(data.demoFulfilledAt || null);
       if (data.hasShippedDemo && form.getValues("quantityCans") === "1") {
         form.setValue("quantityCans", "5");
       }
@@ -304,8 +306,13 @@ export default function DealerForm() {
                         )}
                       </select>
                     </FormControl>
-                    {demoFulfilled && (
-                      <p className="text-xs text-green-500 mt-1">✓ Demo can already fulfilled — orders must be in multiples of 5.</p>
+                    {demoFulfilled && demoFulfilledAt && (
+                      <p className="text-xs text-green-500 mt-1">
+                        ✓ Demo unit fulfilled on {new Date(demoFulfilledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} — orders must be in multiples of 5.
+                      </p>
+                    )}
+                    {demoFulfilled && !demoFulfilledAt && (
+                      <p className="text-xs text-green-500 mt-1">✓ Demo unit fulfilled — orders must be in multiples of 5.</p>
                     )}
                     <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
                   </FormItem>
