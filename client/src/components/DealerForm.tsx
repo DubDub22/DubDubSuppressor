@@ -127,6 +127,8 @@ const MotionWrapButton = ({ children, className = "" }: { children: React.ReactN
 export default function DealerForm() {
   const { toast } = useToast();
   const [requestType, setRequestType] = useState<'none' | 'inquiry' | 'order'>('none');
+  const [demoFulfilled, setDemoFulfilled] = useState(false);
+  const [checkingDemo, setCheckingDemo] = useState(false);
   const form = useForm<z.infer<typeof dealerFormSchema>>({
     resolver: zodResolver(dealerFormSchema),
     defaultValues: {
@@ -138,6 +140,31 @@ export default function DealerForm() {
       quantityCans: "5",
     },
   });
+
+  // Check if dealer already has a shipped demo when email looks valid
+  const checkDemoStatus = async (email: string) => {
+    if (!email.includes("@") || !email.includes(".")) return;
+    setCheckingDemo(true);
+    try {
+      const resp = await fetch(`/api/dealer-request/demo-status?email=${encodeURIComponent(email)}`);
+      const data = await resp.json();
+      setDemoFulfilled(!!data.hasShippedDemo);
+      if (data.hasShippedDemo && form.getValues("quantityCans") === "1") {
+        form.setValue("quantityCans", "5");
+      }
+    } catch {
+      // Non-fatal — leave demo option enabled
+    } finally {
+      setCheckingDemo(false);
+    }
+  };
+
+  // Watch email field for demo status check
+  const emailValue = form.watch("email");
+  React.useEffect(() => {
+    const timer = setTimeout(() => checkDemoStatus(emailValue), 600);
+    return () => clearTimeout(timer);
+  }, [emailValue]);
 
   async function onSubmit(values: z.infer<typeof dealerFormSchema>) {
     if (requestType === 'order' && !values.quantityCans) {
@@ -258,12 +285,30 @@ export default function DealerForm() {
             {requestType === 'order' && (
               <>
                 <FormField control={form.control} name="quantityCans" render={({ field }) => (
-                  <FormItem><FormLabel>Number of DubDubs</FormLabel><FormControl>
-                    <select value={field.value} onChange={field.onChange} className="w-full h-10 rounded-md bg-card border border-border px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-                      <option value="1">1 – Demo Can</option>
-                      {[5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100].map((n) => <option key={n} value={String(n)}>{n}</option>)}
-                    </select>
-                  </FormControl><FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" /></FormItem>
+                  <FormItem>
+                    <FormLabel>Number of DubDubs</FormLabel>
+                    <FormControl>
+                      <select
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={demoFulfilled}
+                        className="w-full h-10 rounded-md bg-card border border-border px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {demoFulfilled ? (
+                          <option value="5">5 – Multiple of 5 required (Demo fulfilled)</option>
+                        ) : (
+                          <>
+                            <option value="1">1 – Demo Can</option>
+                            {[5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100].map((n) => <option key={n} value={String(n)}>{n}</option>)}
+                          </>
+                        )}
+                      </select>
+                    </FormControl>
+                    {demoFulfilled && (
+                      <p className="text-xs text-green-500 mt-1">✓ Demo can already fulfilled — orders must be in multiples of 5.</p>
+                    )}
+                    <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
+                  </FormItem>
                 )} />
                 <FileInputZone id="fflUpload" label="SOT Upload" accept=".pdf,.png,.jpg,.jpeg" required={true} description="Accepted: PDF, PNG, JPG/JPEG" />
                 <FileInputZone id="resaleUpload" label="Resale Certificate" accept=".pdf,.png,.jpg,.jpeg" required={false} description="Accepted: PDF, PNG, JPG/JPEG" />

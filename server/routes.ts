@@ -1062,6 +1062,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if a dealer has a shipped demo order (for form pre-check)
+  app.get("/api/dealer-request/demo-status", async (req, res) => {
+    const { email } = req.query;
+    if (!email || typeof email !== "string") {
+      return res.json({ hasShippedDemo: false });
+    }
+    try {
+      // Check submissions table first
+      const sub = await pool.query(
+        `SELECT 1 FROM submissions WHERE email = $1 AND has_ordered_demo = 'true' AND type = 'dealer' LIMIT 1`,
+        [email]
+      );
+      if (sub.rows.length > 0) {
+        return res.json({ hasShippedDemo: true });
+      }
+      // Also check dealer_orders for shipped demo samples
+      // Match by email via dealers table
+      const dealerOrder = await pool.query(
+        `SELECT 1 FROM dealer_orders o
+         JOIN dealers d ON o.dealer_id::text = d.id::text
+         WHERE d.email = $1 AND o.is_dealer_sample = true AND o.status = 'shipped'
+         LIMIT 1`,
+        [email]
+      );
+      return res.json({ hasShippedDemo: dealerOrder.rows.length > 0 });
+    } catch {
+      return res.json({ hasShippedDemo: false });
+    }
+  });
+
   app.post("/api/dealer-request", async (req, res) => {
     try {
       const { requestType, dealerName, contactName, businessName, email, phone, quantityCans, fflFileName, fflFileData, sotFileName, sotFileData, message, orderKind, fflNumber, ein, resaleFileName, resaleFileData, taxFormFileName, taxFormFileData } = req.body || {};
