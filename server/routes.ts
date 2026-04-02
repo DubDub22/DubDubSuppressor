@@ -1434,6 +1434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!dealerId || !contactName) {
         return res.status(400).json({ ok: false, error: "missing_required_fields" });
       }
+      if (!email && !phone) {
+        return res.status(400).json({ ok: false, error: "email_or_phone_required" });
+      }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ ok: false, error: "invalid_email" });
       }
