@@ -55,8 +55,8 @@ export default function SiteFooter() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <Phone size={14} className="text-primary" />
-                <a href="tel:+14693072270" className="hover:text-primary transition-colors">
-                  (469) 307-2270
+                <a href="tel:+14693078001" className="hover:text-primary transition-colors">
+                  469-307-8001
                 </a>
               </li>
               <li className="flex items-center gap-2">
@@ -71,7 +71,7 @@ export default function SiteFooter() {
 
         <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Double T Tactical, LLC d/b/a DubDub22 &mdash; Florisville, TX
+            &copy; {new Date().getFullYear()} DUBDUB LLC &mdash; Florisville, TX
           </p>
           <p className="text-xs text-muted-foreground">
             dubdub22.com
