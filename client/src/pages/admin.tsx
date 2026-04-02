@@ -92,6 +92,7 @@ type Dealer = {
   orderCount?: number;
   demoCount?: number;
   retailCount?: number;
+  demoFulfilledAt?: string;
   submissions?: Submission[];
 };
 
@@ -225,7 +226,9 @@ function SubmissionsTab({
   setShipTarget: (s: Submission | null) => void;
   onFetchSubmissions: () => void;
 }) {
+  // Exclude warranty submissions — they go to the Warranty tab
   const filtered = submissions.filter((sub) => {
+    if (sub.type === "warranty") return false;
     if (typeFilter !== "all") {
       if (typeFilter === "dealer") { if (!(sub.type === "dealer" && sub.hasOrderedDemo === "true")) return false; }
       else if (sub.type !== typeFilter) return false;
@@ -576,6 +579,7 @@ function DealerRow({ dealer, onClick }: { dealer: Dealer; onClick: () => void })
           {dealer.demoCount !== undefined && <span title="Demo orders">🎯 <strong>{dealer.demoCount}</strong></span>}
           {dealer.retailCount !== undefined && <span title="Retail orders">📦 <strong>{dealer.retailCount}</strong></span>}
         </div>
+        {dealer.demoFulfilledAt && <div className="text-xs text-muted-foreground mt-1">Demo: {fmtDate(dealer.demoFulfilledAt)}</div>}
       </td>
       <td className="px-3 py-3 whitespace-nowrap text-xs text-muted-foreground font-mono">
         {fmtDate(dealer.createdAt)}
