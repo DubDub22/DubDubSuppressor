@@ -367,6 +367,7 @@ export default function DealerMap() {
                               <form onSubmit={async (e) => {
                                 e.preventDefault();
                                 if (!contactDealer) return;
+                                if (!contactEmail && !contactPhone) { toast({ title: "Error", description: "Please provide an email or phone number.", variant: "destructive" }); return; }
                                 setSubmitting(true);
                                 try {
                                   const res = await fetch("/api/retail-inquiry", {
@@ -387,13 +388,16 @@ export default function DealerMap() {
                                     <Input required value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="John Smith" />
                                   </div>
                                   <div>
-                                    <label className="text-sm font-medium mb-1 block">Your Email *</label>
-                                    <Input type="email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
+                                    <label className="text-sm font-medium mb-1 block">Your Email</label>
+                                    <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
                                   </div>
                                   <div>
                                     <label className="text-sm font-medium mb-1 block">Your Phone</label>
                                     <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(555) 555-5555" />
                                   </div>
+                                  { !contactEmail && !contactPhone && (
+                                    <p className="text-xs text-muted-foreground">Please provide an email or phone number so the dealer can reach you.</p>
+                                  )}
                                   <div>
                                     <label className="text-sm font-medium mb-1 block">Message</label>
                                     <textarea className="w-full px-3 py-2 bg-background border border-border text-sm rounded-md resize-none" rows={3} value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} placeholder="I'm interested in the DubDub22 suppressor..." />
@@ -487,6 +491,7 @@ export default function DealerMap() {
                           <form onSubmit={async (e) => {
                             e.preventDefault();
                             if (!contactDealer) return;
+                            if (!contactEmail && !contactPhone) { toast({ title: "Error", description: "Please provide an email or phone number.", variant: "destructive" }); return; }
                             setSubmitting(true);
                             try {
                               const res = await fetch("/api/retail-inquiry", {
@@ -517,13 +522,16 @@ export default function DealerMap() {
                                 <Input required value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="John Smith" />
                               </div>
                               <div>
-                                <label className="text-sm font-medium mb-1 block">Your Email *</label>
-                                <Input type="email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
+                                <label className="text-sm font-medium mb-1 block">Your Email</label>
+                                <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
                               </div>
                               <div>
                                 <label className="text-sm font-medium mb-1 block">Your Phone</label>
                                 <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(555) 555-5555" />
                               </div>
+                              { !contactEmail && !contactPhone && (
+                                <p className="text-xs text-muted-foreground">Please provide an email or phone number so the dealer can reach you.</p>
+                              )}
                               <div>
                                 <label className="text-sm font-medium mb-1 block">Message</label>
                                 <textarea
