@@ -127,7 +127,7 @@ export default function ContactPage() {
                     <MapPin className="w-5 h-5 text-primary mt-0.5" />
                     <div>
                       <p className="text-sm font-medium mb-1">Location</p>
-                      <p className="text-sm text-muted-foreground">Florisville, TX</p>
+                      <p className="text-sm text-muted-foreground">Floresville, TX</p>
                     </div>
                   </div>
                 </CardContent>

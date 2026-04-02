@@ -268,7 +268,7 @@ export default function OrderConfirmationPage() {
             </p>
 
             <p className="text-muted-foreground italic">
-              Double T Tactical, LLC d/b/a DubDub22 &mdash; Florisville, TX &mdash; dubdub22.com
+              Double T Tactical, LLC d/b/a DubDub22 &mdash; Floresville, TX &mdash; dubdub22.com
             </p>
           </div>
 
