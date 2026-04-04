@@ -852,12 +852,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { execSync } = await import("child_process");
       const script = "/home/dubdub/DubDub-Hub/bot/services/label_generator.py";
       const output = execSync(`python3 ${script} ${start} ${end}`, { encoding: "utf-8" }).trim();
-      const match = output.match(/Generated label strip PDF: (.+)/);
+      const match = output.match(/Generated label strip: (.+)/);
       const pdfPath = match ? match[1] : null;
       if (!pdfPath) {
         return res.status(500).json({ ok: false, error: "Label generation failed", detail: output });
       }
-      const filename = `labels_${start}-${end}.pdf`;
+      const filename = pdfPath.split("/").pop() || "";
       const labelCount = end - start + 1;
       await pool.query(
         "INSERT INTO serial_label_runs (start_serial, end_serial, filename, file_path, label_count) VALUES ($1, $2, $3, $4, $5)",
