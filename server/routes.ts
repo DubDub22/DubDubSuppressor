@@ -824,6 +824,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate serial label PDF (roll strip, 2x2 labels)
+  app.post("/api/admin/labels/generate", requireAdmin, async (req, res) => {
+    try {
+      const { startSerial, endSerial } = req.body || {};
+      if (!startSerial || !endSerial) {
+        return res.status(400).json({ ok: false, error: "startSerial and endSerial are required" });
+      }
+      const start = parseInt(startSerial, 10);
+      const end = parseInt(endSerial, 10);
+      if (isNaN(start) || isNaN(end) || start > end || end - start > 1000) {
+        return res.status(400).json({ ok: false, error: "Invalid serial range (max 1000 labels at once)" });
+      }
+      const { execSync } = await import("child_process");
+      const script = "/home/dubdub/DubDub-Hub/bot/services/label_generator.py";
+      const output = execSync(`python3 ${script} ${start} ${end}`, { encoding: "utf-8" }).trim();
+      const match = output.match(/Generated label strip PDF: (.+)/);
+      const pdfPath = match ? match[1] : null;
+      if (!pdfPath) {
+        return res.status(500).json({ ok: false, error: "Label generation failed", detail: output });
+      }
+      return res.json({ ok: true, pdfPath, filename: `labels_${start}-${end}.pdf` });
+    } catch (err: any) {
+      console.error("label_generate_error", err);
+      return res.status(500).json({ ok: false, error: "Generation failed", detail: err.message });
+    }
+  });
+
+  // Download a generated label PDF
+  app.get("/api/admin/labels/download", requireAdmin, async (req, res) => {
+    try {
+      const { path: requestedPath } = req.query || {};
+      if (!requestedPath || typeof requestedPath !== "string") {
+        return res.status(400).json({ ok: false, error: "path is required" });
+      }
+      const safePath = requestedPath.replace(/[^0-9\-.]/g, "");
+      const pdfPath = `/home/dubdub/DubDub-Hub/static/labels/${safePath}`;
+      const fs = await import("fs");
+      if (!fs.existsSync(pdfPath)) {
+        return res.status(404).json({ ok: false, error: "File not found" });
+      }
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${safePath}"`);
+      return res.sendFile(pdfPath);
+    } catch (err: any) {
+      console.error("label_download_error", err);
+      return res.status(500).json({ ok: false, error: "Download failed" });
+    }
+  });
+
   // Parse SOT file — extract text from PDF/image and return structured data
   app.post("/api/admin/dealers/parse-sot", requireAdmin, async (req, res) => {
     try {
