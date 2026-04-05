@@ -1120,33 +1120,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ── FFL Upload (pending dealer) ─────────────────────────────────────────────
+  // ── FFL Upload (pending dealer — text only, no file) ─────────────────────────
   app.post("/api/ffl/upload", async (req, res) => {
     try {
-      const { fflNumber, fflData, sotData, sotFileName } = req.body;
+      const { fflNumber, dealerName, contactName, email, phone, address, message } = req.body;
       if (!fflNumber) return res.status(400).json({ ok: false, error: "missing_ffl" });
-      if (!fflData) return res.status(400).json({ ok: false, error: "missing_ffl_document" });
 
       const normalized = fflNumber.replace(/[^0-9A-Za-z]/gi, "").toUpperCase();
 
       // Check if already in dealers table
       const existing = await pool.query(
-        `SELECT id FROM dealers WHERE UPPER(REPLACE(REPLACE(ffl_license_number, '-', ''), ' ', '')) = $1`,
+        `SELECT id, business_name, contact_name, email, phone, business_address FROM dealers WHERE UPPER(REPLACE(REPLACE(ffl_license_number, '-', ''), ' ', '')) = $1`,
         [normalized]
       );
 
       if (existing.rows.length > 0) {
-        // Update existing record with uploaded documents
+        // Update existing record with contact info (file fields left as-is)
         await pool.query(
-          `UPDATE dealers SET ffl_file_name = $1, ffl_file_data = $2, sot_file_name = $3, sot_file_data = $4 WHERE id = $5`,
-          [`${normalized}_ffl`, fflData, sotFileName || null, sotData || null, existing.rows[0].id]
+          `UPDATE dealers SET business_name = COALESCE(NULLIF($1, ''), business_name), contact_name = COALESCE(NULLIF($2, ''), contact_name), email = COALESCE(NULLIF($3, ''), email), phone = COALESCE(NULLIF($4, ''), phone), business_address = COALESCE(NULLIF($5, ''), business_address), notes = COALESCE(NULLIF($6, ''), notes) WHERE id = $7`,
+          [dealerName, contactName, email, phone, address, message, existing.rows[0].id]
         );
       } else {
         // Create a pending dealer entry
         await pool.query(
-          `INSERT INTO dealers (business_name, ffl_license_number, ffl_file_name, ffl_file_data, sot_file_name, sot_file_data, verified, source)
-           VALUES ($1, $2, $3, $4, $5, $6, false, 'pending_upload')`,
-          [`Pending FFL ${normalized}`, normalized, `${normalized}_ffl`, fflData, sotFileName || null, sotData || null]
+          `INSERT INTO dealers (business_name, ffl_license_number, contact_name, email, phone, business_address, notes, verified, source)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, false, 'pending_upload')`,
+          [dealerName || `Pending FFL ${normalized}`, normalized, contactName || null, email || null, phone || null, address || null, message || null]
         );
       }
 
