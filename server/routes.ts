@@ -1149,6 +1149,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
+      // Send confirmation email to the dealer with the multi-state tax form attached
+      if (email) {
+        const taxFormPath = path.join(__dirname, "../shared/multi_state_tax_form.pdf");
+        const taxFormBase64 = fs.existsSync(taxFormPath)
+          ? fs.readFileSync(taxFormPath).toString("base64")
+          : null;
+
+        const emailText = `Thanks for submitting your dealer application to DubDub22. To complete your dealer profile, please email us:
+- A copy of your FFL
+- A copy of your SOT
+- The completed multi-state tax form (attached)
+
+We'll review your application and be in touch shortly.
+
+DubDub22 Minions`;
+
+        const emailOptions: {
+          to: string;
+          subject: string;
+          text: string;
+          attachment?: { filename: string; base64Data: string; contentType: string };
+        } = {
+          to: email,
+          subject: "Your DubDub22 Dealer Application",
+          text: emailText,
+        };
+
+        if (taxFormBase64) {
+          emailOptions.attachment = {
+            filename: "multi_state_tax_form.pdf",
+            base64Data: taxFormBase64,
+            contentType: "application/pdf",
+          };
+        }
+
+        try {
+          await sendEmail(emailOptions);
+        } catch (emailErr) {
+          console.error("ffl_upload_confirmation_email_error", emailErr);
+          // Don't fail the submission if the email fails
+        }
+      }
+
       return res.json({ ok: true, message: "FFL submitted for review" });
     } catch (err: any) {
       console.error("ffl_upload_error", err);
