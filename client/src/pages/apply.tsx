@@ -105,48 +105,24 @@ const FileZone = React.forwardRef<HTMLInputElement, {
 
 function PendingUpload(props: { fflNumber: string }) {
   const { toast } = useToast();
-  const fflRef = React.useRef<HTMLInputElement>(null);
-  const sotRef = React.useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    e.stopPropagation();
-    const fflFile = fflRef.current?.files?.[0] || null;
-    const sotFile = sotRef.current?.files?.[0] || null;
-    console.log("[DUB_DUB] handleSubmit fired", { fflFile: fflFile?.name, sotFile: sotFile?.name });
-    if (!fflFile && !sotFile) {
-      console.log("[DUB_DUB] NO FILES - showing toast");
-      toast({ title: "FFL or SOT Required", description: "Please upload your FFL or SOT document.", variant: "destructive" });
-      return;
-    }
     setSubmitting(true);
     try {
-      console.log("[DUB_DUB] reading files...");
-      const fflData = fflFile ? await readFileAsBase64(fflFile).then(b => b.split(",")[1]) : undefined;
-      const sotData = sotFile ? await readFileAsBase64(sotFile).then(b => b.split(",")[1]) : undefined;
-      console.log("[DUB_DUB] fflData length:", fflData?.length, "sotData length:", sotData?.length);
       const resp = await fetch("/api/ffl/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fflNumber: props.fflNumber,
-          fflData,
-          sotData,
-          sotFileName: sotFile?.name || null,
-        }),
+        body: JSON.stringify({ fflNumber: props.fflNumber }),
       });
-      console.log("[DUB_DUB] resp status:", resp.status);
       const data = await resp.json();
-      console.log("[DUB_DUB] resp data:", JSON.stringify(data));
-      if (!resp.ok) throw new Error(data.error || "Upload failed");
+      if (!resp.ok) throw new Error(data.error || "Submission failed");
       setSubmitted(true);
     } catch (err: any) {
-      console.log("[DUB_DUB] catch err:", err.message);
-      toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
-      console.log("[DUB_DUB] finally, setting submitting=false");
       setSubmitting(false);
     }
   }
@@ -180,20 +156,7 @@ function PendingUpload(props: { fflNumber: string }) {
           <span className="font-mono text-primary">{props.fflNumber}</span>
         </p>
       </div>
-      <FileZone
-        id="ffl-upload"
-        label="FFL Document"
-        accept=".pdf,.png,.jpg,.jpeg"
-        description="Accepted: PDF, PNG, JPG"
-        ref={fflRef}
-      />
-      <FileZone
-        id="sot-upload"
-        label="SOT Document"
-        accept=".pdf,.png,.jpg,.jpeg"
-        description="Accepted: PDF, PNG, JPG"
-        ref={sotRef}
-      />
+
       <Button
         type="button"
         disabled={submitting}
