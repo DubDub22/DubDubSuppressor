@@ -221,6 +221,8 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
   const { toast } = useToast();
   const [orderKind, setOrderKind] = useState<"inquiry" | "demo" | "stocking">("inquiry");
   const [quantityCans, setQuantityCans] = useState("5");
+  const [fflFile, setFflFile] = useState<File | null>(null);
+  const [sotFile, setSotFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -239,19 +241,21 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
   });
 
   async function onSubmit(values: DealerApplyValues) {
+    if (!fflFile && !sotFile) {
+      toast({ title: "FFL or SOT Required", description: "Please upload your FFL or SOT document.", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
-      const fflInput = document.getElementById("ffl-upload") as HTMLInputElement | null;
-      const sotInput = document.getElementById("sot-upload") as HTMLInputElement | null;
-      const fflData = fflInput?.files?.[0] ? await processImage(fflInput.files[0]) : undefined;
-      const sotData = sotInput?.files?.[0] ? await processImage(sotInput.files[0]) : undefined;
+      const fflData = fflFile ? await processImage(fflFile) : undefined;
+      const sotData = sotFile ? await processImage(sotFile) : undefined;
 
       const body: Record<string, unknown> = {
         ...values,
         orderKind,
-        fflFileName: fflInput?.files?.[0]?.name || "onfile",
+        fflFileName: fflFile?.name || "onfile",
         fflFileData: fflData,
-        sotFileName: sotInput?.files?.[0]?.name || null,
+        sotFileName: sotFile?.name || null,
         sotFileData: sotData,
       };
 
@@ -533,6 +537,7 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
             label="FFL on File"
             accept=".pdf,.png,.jpg,.jpeg"
             description="Accepted: PDF, PNG, JPG"
+            onFileSelect={setFflFile}
           />
           <FileZone
             id="sot-upload"
@@ -540,6 +545,7 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
             accept=".pdf,.png,.jpg,.jpeg"
             required={sotRequired}
             description="Accepted: PDF, PNG, JPG"
+            onFileSelect={setSotFile}
           />
         </div>
 
