@@ -163,7 +163,7 @@ export default function DealerForm() {
 
             <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem>
-                <Label>Email</Label>
+                <FormLabel>Email</FormLabel>
                 <FormControl><Input placeholder="john@example.com" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
                 <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
               </FormItem>

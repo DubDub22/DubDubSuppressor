@@ -4,6 +4,10 @@ import fs from "fs";
 import { execSync } from "child_process";
 import { globSync } from "glob";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import session from "express-session";
 import { storage } from "./storage";
 import { uploadDealerDocuments } from "./sftp-upload";
@@ -1185,7 +1189,7 @@ DubDub22 Minions`;
         }
 
         try {
-          await sendEmail(emailOptions);
+          await sendViaGmail(emailOptions);
         } catch (emailErr) {
           console.error("ffl_upload_confirmation_email_error", emailErr);
           // Don't fail the submission if the email fails
@@ -1960,14 +1964,14 @@ DubDub22 Minions`;
         [id]
       );
 
-      const emailHtml = `<p>Your FFL/SOT submission has been reviewed and could not be verified at this time.</p>
-${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}
-<p>Please visit <a href="https://dubdub22.com/dealers">dubdub22.com/dealers</a> to submit a new, valid FFL/SOT.</p>
-<p>— DubDub22 Minions</p>`;
-      await sendEmail({
+      const emailText = `Your FFL/SOT submission has been reviewed and could not be verified at this time.
+${reason ? `\nReason: ${reason}` : ""}
+Please visit https://dubdub22.com/dealers to submit a new, valid FFL/SOT.
+— DubDub22 Minions`;
+      await sendViaGmail({
         to: dealer.rows[0].email,
-        subject: `DubDub22 FFL/SOT Verification — Action Required`,
-        html: emailHtml,
+        subject: `DubDub22 FFL/SOT Verification - Action Required`,
+        text: emailText,
       });
 
       return res.json({ ok: true });
