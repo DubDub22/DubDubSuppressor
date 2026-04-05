@@ -24,6 +24,7 @@ const dealerApplySchema = z.object({
   ein: z.string().optional(),
   contactPhone: z.string().optional(),
   message: z.string().optional(),
+  address: z.string().optional(),
 });
 
 type DealerApplyValues = z.infer<typeof dealerApplySchema>;
@@ -108,14 +109,44 @@ function PendingUpload(props: { fflNumber: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const pendingSchema = z.object({
+    dealerName: z.string().min(2, "FFL / Dealer name is required"),
+    contactName: z.string().min(2, "Contact name is required"),
+    email: z.string().email("Valid email is required"),
+    phone: z.string().min(10, "Valid phone number is required"),
+    address: z.string().min(5, "Address is required"),
+    message: z.string().optional(),
+  });
+
+  type PendingValues = z.infer<typeof pendingSchema>;
+
+  const form = useForm<PendingValues>({
+    resolver: zodResolver(pendingSchema),
+    defaultValues: {
+      dealerName: "",
+      contactName: "",
+      email: "",
+      phone: "",
+      address: "",
+      message: "",
+    },
+  });
+
+  async function onSubmit(values: PendingValues) {
     setSubmitting(true);
     try {
       const resp = await fetch("/api/ffl/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fflNumber: props.fflNumber }),
+        body: JSON.stringify({
+          fflNumber: props.fflNumber,
+          dealerName: values.dealerName,
+          contactName: values.contactName,
+          email: values.email,
+          phone: values.phone,
+          address: values.address,
+          message: values.message || null,
+        }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Submission failed");
@@ -137,42 +168,129 @@ function PendingUpload(props: { fflNumber: string }) {
         >
           <CheckCircle className="w-8 h-8 text-green-400" />
         </motion.div>
-        <h2 className="text-2xl font-bold">FFL Submitted for Review</h2>
+        <h2 className="text-2xl font-bold">Application Submitted</h2>
         <p className="text-muted-foreground max-w-md mx-auto">
-          Your FFL has been submitted. We will review it and add you to our dealer list. You will receive an email once approved.
+          Check your spam folder for an email from dubdub22.com. We will be in touch soon.
         </p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-sm text-yellow-200">
-        Your FFL was not found in our database. Upload your FFL and we will verify it and add you.
-      </div>
-      <div className="space-y-1">
-        <p className="text-sm font-medium">
-          FFL Number:{" "}
-          <span className="font-mono text-primary">{props.fflNumber}</span>
-        </p>
-      </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-sm text-yellow-200">
+          Your FFL was not found in our database. Fill out the form below and we will verify your FFL and add you to our dealer list.
+        </div>
 
-      <Button
-        type="button"
-        disabled={submitting}
-        className="w-full font-display text-lg h-12 bg-primary hover:bg-primary/90 cursor-pointer"
-        onClick={() => { console.log("[DUB_DUB] button clicked"); handleSubmit({ preventDefault: () => {}, stopPropagation: () => {} } as any); }}
-      >
-        {submitting ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Submitting...
-          </span>
-        ) : (
-          "SUBMIT FOR REVIEW"
-        )}
-      </Button>
-    </form>
+        <div className="space-y-1">
+          <p className="text-sm font-medium">
+            FFL Number:{" "}
+            <span className="font-mono text-primary">{props.fflNumber}</span>
+          </p>
+        </div>
+
+        <FormField
+          control={form.control}
+          name="dealerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>FFL / Dealer Name</FormLabel>
+              <FormControl>
+                <Input {...field} className="bg-card border-border" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="contactName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Point of Contact</FormLabel>
+              <FormControl>
+                <Input {...field} className="bg-card border-border" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email Address</FormLabel>
+                <FormControl>
+                  <Input {...field} type="email" className="bg-card border-border" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number</FormLabel>
+                <FormControl>
+                  <Input {...field} type="tel" className="bg-card border-border" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Business Address</FormLabel>
+              <FormControl>
+                <Input {...field} className="bg-card border-border" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="message"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Message <span className="text-xs text-muted-foreground font-normal">(optional)</span></FormLabel>
+              <FormControl>
+                <Textarea rows={3} {...field} className="bg-card border-border resize-none" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button
+          type="submit"
+          disabled={submitting}
+          className="w-full font-display text-lg h-12 bg-primary hover:bg-primary/90 cursor-pointer"
+        >
+          {submitting ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Submitting...
+            </span>
+          ) : (
+            "SUBMIT FOR REVIEW"
+          )}
+        </Button>
+      </form>
+    </Form>
   );
 }
 
