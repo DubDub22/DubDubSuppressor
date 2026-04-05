@@ -9,12 +9,13 @@ function padLeft(str: string, len: number): string {
 }
 
 function parseFFLNumber(rec: Record<string, string>): string {
-  const reg = padLeft(rec.LIC_REGN.trim(), 2);
-  const dist = padLeft(rec.LIC_DIST.trim(), 3);
-  const cnty = padLeft(rec.LIC_CNTY.trim(), 3);
-  const type = padLeft(rec.LIC_TYPE.trim(), 2);
+  // No padding — store FFL as-is from the source data
+  const reg = rec.LIC_REGN.trim();
+  const dist = rec.LIC_DIST.trim();
+  const cnty = rec.LIC_CNTY.trim();
+  const type = rec.LIC_TYPE.trim();
   const exp = rec.LIC_XPRDTE.trim().toUpperCase();
-  const seq = padLeft(rec.LIC_SEQN.trim(), 5);
+  const seq = rec.LIC_SEQN.trim();
   return `${reg}-${dist}-${cnty}-${type}-${exp}-${seq}`;
 }
 
