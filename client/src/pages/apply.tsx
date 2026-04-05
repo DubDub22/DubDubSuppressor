@@ -19,12 +19,19 @@ const dealerApplySchema = z.object({
   dealerName: z.string().min(2, "Dealer / FFL name is required"),
   contactName: z.string().min(2, "Contact name is required"),
   email: z.string().email("Valid email is required"),
-  fflNumber: z.string().min(9, "Valid FFL number is required"),
+  confirmEmail: z.string().email("Please confirm your email"),
+  fflNumber: z.string().min(15, "Full 15-digit FFL number is required").max(15),
   fflExpiry: z.string().optional(),
   ein: z.string().optional(),
   contactPhone: z.string().optional(),
-  message: z.string().optional(),
   address: z.string().optional(),
+  city: z.string().min(2, "City is required"),
+  state: z.string().min(2, "State is required"),
+  zipCode: z.string().min(5, "ZIP code is required"),
+  message: z.string().min(1, "Message is required"),
+}).refine((data) => data.email === data.confirmEmail, {
+  message: "Emails do not match",
+  path: ["confirmEmail"],
 });
 
 type DealerApplyValues = z.infer<typeof dealerApplySchema>;
@@ -307,11 +314,15 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
       dealerName: props.dealerName || "",
       contactName: "",
       email: props.email || "",
+      confirmEmail: "",
       fflNumber: props.fflNumber,
       fflExpiry: props.expiry || "",
       ein: "",
       contactPhone: props.phone || "",
       address: "",
+      city: "",
+      state: "",
+      zipCode: "",
       message: "",
     },
   });
@@ -319,8 +330,9 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
   async function onSubmit(values: DealerApplyValues) {
     setSubmitting(true);
     try {
+      const { confirmEmail, ...rest } = values;
       const body: Record<string, unknown> = {
-        ...values,
+        ...rest,
         orderKind,
       };
 
@@ -417,6 +429,12 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
           <FormField control={form.control} name="email" render={({ field }) => (
             <FormItem><FormLabel>Contact Email</FormLabel><FormControl><Input {...field} type="email" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
           )} />
+          <FormField control={form.control} name="confirmEmail" render={({ field }) => (
+            <FormItem><FormLabel>Confirm Email</FormLabel><FormControl><Input {...field} type="email" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
           <FormField control={form.control} name="contactPhone" render={({ field }) => (
             <FormItem><FormLabel>Contact Phone <span className="text-xs text-muted-foreground font-normal">(optional)</span></FormLabel><FormControl><Input {...field} type="tel" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
           )} />
@@ -438,6 +456,18 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
           )} />
           <FormField control={form.control} name="address" render={({ field }) => (
             <FormItem><FormLabel>Business Address <span className="text-xs text-muted-foreground font-normal">(optional)</span></FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <FormField control={form.control} name="city" render={({ field }) => (
+            <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="state" render={({ field }) => (
+            <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="zipCode" render={({ field }) => (
+            <FormItem><FormLabel>ZIP Code</FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
           )} />
         </div>
 
@@ -465,7 +495,7 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
         {orderKind === "inquiry" && (
           <FormField control={form.control} name="message" render={({ field }) => (
             <FormItem>
-              <FormLabel>Questions or Comments <span className="text-xs text-muted-foreground font-normal">(optional)</span></FormLabel>
+              <FormLabel>Questions or Comments <span className="text-xs text-red-400 font-normal">(required)</span></FormLabel>
               <FormControl><Textarea rows={3} {...field} placeholder="Tell us about your shop, what you're looking for..." className="bg-card border-border resize-none" /></FormControl>
               <FormMessage />
             </FormItem>
