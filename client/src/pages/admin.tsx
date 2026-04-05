@@ -2077,6 +2077,51 @@ function VerifyFflTab() {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Pending FFL/SOT Verification ({records.length})</h2>
+
+      {/* FFL Lookup by License Number */}
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          id="ffl-lookup-input"
+          maxLength={15}
+          placeholder="Enter FFL license number (up to 15 digits)"
+          className="flex-1 px-3 py-2 text-sm border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary font-mono uppercase"
+          onKeyDown={async (e) => {
+            if (e.key === "Enter") {
+              const val = (e.target as HTMLInputElement).value.trim().toUpperCase();
+              if (!val) return;
+              // Find matching record and open review
+              const match = records.find(r => r.ffl_license_number?.toUpperCase() === val);
+              if (match) {
+                setReviewTarget(match);
+                (e.target as HTMLInputElement).value = "";
+              } else {
+                toast({ title: "Not Found", description: `No pending FFL match for "${val}".`, variant: "destructive" });
+              }
+            }
+          }}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="cursor-pointer"
+          onClick={() => {
+            const input = document.getElementById("ffl-lookup-input") as HTMLInputElement;
+            const val = input.value.trim().toUpperCase();
+            if (!val) return;
+            const match = records.find(r => r.ffl_license_number?.toUpperCase() === val);
+            if (match) {
+              setReviewTarget(match);
+              input.value = "";
+            } else {
+              toast({ title: "Not Found", description: `No pending FFL match for "${val}".`, variant: "destructive" });
+            }
+          }}
+        >
+          Lookup FFL
+        </Button>
+      </div>
+
       {records.length === 0 ? (
         <p className="text-muted-foreground text-sm">No pending FFL/SOT uploads to review.</p>
       ) : (
