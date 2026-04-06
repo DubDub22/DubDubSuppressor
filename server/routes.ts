@@ -1276,12 +1276,18 @@ DubDub22 Minions`;
 
       // ── Auto-create or find dealer record ──────────────────────────
       let dealerId: string;
+      let dealerFormStatus = { fflOnFile: false, sotOnFile: false, taxFormOnFile: false };
       const existingDealer = await pool.query(
-        `SELECT id FROM dealers WHERE email = $1 LIMIT 1`,
+        `SELECT id, ffl_on_file, sot_on_file, tax_form_on_file FROM dealers WHERE email = $1 LIMIT 1`,
         [email.toLowerCase()]
       );
       if (existingDealer.rows.length > 0) {
         dealerId = existingDealer.rows[0].id;
+        dealerFormStatus = {
+          fflOnFile: !!existingDealer.rows[0].ffl_on_file,
+          sotOnFile: !!existingDealer.rows[0].sot_on_file,
+          taxFormOnFile: !!existingDealer.rows[0].tax_form_on_file,
+        };
         // Upgrade to Preferred tier on any submission
         await pool.query(
           `UPDATE dealers SET tier = 'Preferred', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND tier = 'Standard'`,
@@ -1383,22 +1389,45 @@ DubDub22 Minions`;
         );
       }
 
+      // Build forms status paragraph for auto-reply
+      const formsStatus: string[] = [];
+      if (dealerFormStatus.fflOnFile) formsStatus.push("FFL on file ✓");
+      if (dealerFormStatus.sotOnFile) formsStatus.push("SOT on file ✓");
+      if (dealerFormStatus.taxFormOnFile) formsStatus.push("Tax form on file ✓");
+      const missingForms: string[] = [];
+      if (!dealerFormStatus.fflOnFile) missingForms.push("a current FFL");
+      if (!dealerFormStatus.sotOnFile) missingForms.push("a current SOT");
+      if (!dealerFormStatus.taxFormOnFile) missingForms.push("a completed multi-state tax form");
+      const formsParagraph = formsStatus.length > 0
+        ? (missingForms.length > 0
+            ? `We have your current ${formsStatus.join(", ")} on file. Please send us ${missingForms.join(", ")}.`
+            : `We have all your current forms on file. Thank you!`)
+        : (missingForms.length > 0
+            ? `To complete your dealer profile, please send us ${missingForms.join(", ")}.`
+            : "");
+
       // Send auto-reply to the dealer
       if (email) {
         try {
+          const autoReplyLines = [
+            `Thank you for ${isInquiry ? 'submitting a dealer inquiry' : 'placing a dealer order'} with DubDub22.`,
+            ``,
+            `We've received your ${isInquiry ? 'inquiry' : 'order'} and will be in touch soon.`,
+            ``,
+          ];
+          if (formsParagraph) {
+            autoReplyLines.push(formsParagraph, ``);
+          }
+          autoReplyLines.push(
+            `If you have any questions, reach out to us at sales@dubdub22.com.`,
+            ``,
+            `Best regards,`,
+            `DubDub22 Team`,
+          );
           await sendViaGmail({
             to: email,
             subject: `We Received Your DubDub22 ${isInquiry ? 'Inquiry' : 'Order'}`,
-            text: [
-              `Thank you for ${isInquiry ? 'submitting a dealer inquiry' : 'placing a dealer order'} with DubDub22.`,
-              ``,
-              `We've received your ${isInquiry ? 'inquiry' : 'order'} and will be in touch soon.`,
-              ``,
-              `If you have any questions, reach out to us at sales@dubdub22.com.`,
-              ``,
-              `Best regards,`,
-              `DubDub22 Team`,
-            ].join("\n"),
+            text: autoReplyLines.join("\n"),
           });
         } catch (gmailErr) {
           console.error("dealer_request_auto_reply_error", gmailErr);
