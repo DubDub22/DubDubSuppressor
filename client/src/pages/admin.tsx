@@ -74,16 +74,21 @@ type Dealer = {
   sotReceiptDate?: string;
   sotFileName?: string;
   sotFileData?: string;
+  sotOnFile?: boolean;
+  sotExpiryDate?: string;
   fflLicenseNumber?: string;
   fflLicenseType?: string;
   fflExpiry?: string;
   fflFileName?: string;
   fflFileData?: string;
+  fflOnFile?: boolean;
+  fflExpiryDate?: string;
   taxExempt?: boolean;
   taxExemptNotes?: string;
   salesTaxId?: string;
   salesTaxFormData?: string;
   salesTaxFormName?: string;
+  taxFormOnFile?: boolean;
   notes?: string;
   sourceSubmissionId?: string;
   purchased?: boolean;
@@ -184,27 +189,38 @@ function FileDownload({ fileName, fileData }: { fileName?: string; fileData?: st
 
 function SotBadge({ dealer }: { dealer: Dealer }) {
   const now = new Date();
-  const end = dealer.sotPeriodEnd ? parseISO(`20${dealer.sotPeriodEnd}`) : null;
+  // Prefer new sotExpiryDate (ISO), fall back to old sotPeriodEnd string
+  const endStr = dealer.sotExpiryDate || dealer.sotPeriodEnd;
+  const end = endStr
+    ? (endStr.includes("/") ? parseISO(`20${endStr}`) : parseISO(endStr))
+    : null;
   const expired = end && end < now;
   const soon = end && !expired && (end.getTime() - now.getTime()) < 90 * 24 * 60 * 60 * 1000;
+  // Use sot_on_file boolean if set, otherwise fall back to presence of license type
+  if (!dealer.sotOnFile && !dealer.sotLicenseType) return <Badge variant="secondary" className="text-xs">No SOT</Badge>;
   if (expired) return <Badge variant="destructive" className="text-xs">SOT Expired</Badge>;
   if (soon) return <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-600">SOT Expiring Soon</Badge>;
-  if (dealer.sotLicenseType) return <Badge variant="default" className="text-xs bg-green-600">SOT Active</Badge>;
-  return <Badge variant="secondary" className="text-xs">No SOT</Badge>;
+  return <Badge variant="default" className="text-xs bg-green-600">SOT Active</Badge>;
 }
 
 function FflBadge({ dealer }: { dealer: Dealer }) {
   const now = new Date();
-  const end = dealer.fflExpiry ? parseISO(dealer.fflExpiry) : null;
+  // Prefer new fflExpiryDate (ISO), fall back to old fflExpiry string (MM/DD/YYYY)
+  const endStr = dealer.fflExpiryDate || dealer.fflExpiry;
+  const end = endStr
+    ? (endStr.includes("/") ? parseISO(endStr) : parseISO(endStr))
+    : null;
   const expired = end && end < now;
   const soon = end && !expired && (end.getTime() - now.getTime()) < 90 * 24 * 60 * 60 * 1000;
+  // Use ffl_on_file boolean if set, otherwise fall back to presence of license number
+  if (!dealer.fflOnFile && !dealer.fflLicenseNumber) return <Badge variant="secondary" className="text-xs">No FFL</Badge>;
   if (expired) return <Badge variant="destructive" className="text-xs">FFL Expired</Badge>;
   if (soon) return <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-600">FFL Expiring Soon</Badge>;
-  if (dealer.fflLicenseNumber) return <Badge variant="default" className="text-xs bg-green-600">FFL Active</Badge>;
-  return <Badge variant="secondary" className="text-xs">No FFL</Badge>;
+  return <Badge variant="default" className="text-xs bg-green-600">FFL Active</Badge>;
 }
 
 function TaxBadge({ dealer }: { dealer: Dealer }) {
+  if (dealer.taxFormOnFile) return <Badge variant="default" className="text-xs bg-blue-600">Tax Form ✓</Badge>;
   if (dealer.taxExempt) return <Badge variant="default" className="text-xs bg-blue-600">Tax Exempt</Badge>;
   return null;
 }
@@ -440,24 +456,29 @@ function DealersTab({ dealers, isLoading, onSelect, onAddNew }: {
       {(() => {
         const now = new Date();
         const sotSoon = dealers.filter(d => {
-          if (!d.sotPeriodEnd) return false;
-          const end = parseISO(`20${d.sotPeriodEnd}`);
+          const str = d.sotExpiryDate || d.sotPeriodEnd;
+          if (!str) return false;
+          const end = str.includes("/") ? parseISO(`20${str}`) : parseISO(str);
           const diff = end.getTime() - now.getTime();
           return diff > 0 && diff < 90 * 24 * 60 * 60 * 1000;
         });
         const sotExpired = dealers.filter(d => {
-          if (!d.sotPeriodEnd) return false;
-          return parseISO(`20${d.sotPeriodEnd}`) < now;
+          const str = d.sotExpiryDate || d.sotPeriodEnd;
+          if (!str) return false;
+          const end = str.includes("/") ? parseISO(`20${str}`) : parseISO(str);
+          return end < now;
         });
         const fflSoon = dealers.filter(d => {
-          if (!d.fflExpiry) return false;
-          const end = parseISO(d.fflExpiry);
+          const str = d.fflExpiryDate || d.fflExpiry;
+          if (!str) return false;
+          const end = parseISO(str);
           const diff = end.getTime() - now.getTime();
           return diff > 0 && diff < 90 * 24 * 60 * 60 * 1000;
         });
         const fflExpired = dealers.filter(d => {
-          if (!d.fflExpiry) return false;
-          return parseISO(d.fflExpiry) < now;
+          const str = d.fflExpiryDate || d.fflExpiry;
+          if (!str) return false;
+          return parseISO(str) < now;
         });
         const total = sotSoon.length + sotExpired.length + fflSoon.length + fflExpired.length;
         if (total === 0) return null;
@@ -466,10 +487,10 @@ function DealersTab({ dealers, isLoading, onSelect, onAddNew }: {
             <div className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
               <span className="text-base">⚠️</span> Document Expiry Alerts — {total} dealer{total !== 1 ? "s" : ""} need attention
             </div>
-            {sotExpired.map(d => <div key={`sot-exp-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">❌ <strong>{d.businessName}</strong> — SOT expired {d.sotPeriodEnd}</div>)}
-            {sotSoon.map(d => <div key={`sot-soon-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">🟡 <strong>{d.businessName}</strong> — SOT expiring {d.sotPeriodEnd}</div>)}
-            {fflExpired.map(d => <div key={`ffl-exp-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">❌ <strong>{d.businessName}</strong> — FFL expired {d.fflExpiry}</div>)}
-            {fflSoon.map(d => <div key={`ffl-soon-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">🟡 <strong>{d.businessName}</strong> — FFL expiring {d.fflExpiry}</div>)}
+            {sotExpired.map(d => <div key={`sot-exp-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">❌ <strong>{d.businessName}</strong> — SOT expired {d.sotExpiryDate || d.sotPeriodEnd}</div>)}
+            {sotSoon.map(d => <div key={`sot-soon-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">🟡 <strong>{d.businessName}</strong> — SOT expiring {d.sotExpiryDate || d.sotPeriodEnd}</div>)}
+            {fflExpired.map(d => <div key={`ffl-exp-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">❌ <strong>{d.businessName}</strong> — FFL expired {d.fflExpiryDate || d.fflExpiry}</div>)}
+            {fflSoon.map(d => <div key={`ffl-soon-${d.id}`} className="text-xs text-yellow-700 dark:text-yellow-300">🟡 <strong>{d.businessName}</strong> — FFL expiring {d.fflExpiryDate || d.fflExpiry}</div>)}
           </div>
         );
       })()}

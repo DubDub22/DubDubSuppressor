@@ -691,10 +691,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "sotLicenseType","sotTaxYear","sotPeriodStart","sotPeriodEnd",
         "sotControlNumber","sotReceiptDate",
         "sotFileName","sotFileData",
+        "sotOnFile","sotExpiryDate",
         "fflLicenseNumber","fflLicenseType","fflExpiry",
         "fflFileName","fflFileData",
+        "fflOnFile","fflExpiryDate",
         "taxExempt","taxExemptNotes","salesTaxId",
         "salesTaxFormData","salesTaxFormName",
+        "taxFormOnFile",
         "notes",
         "purchased","lastOrderDate"
       ];
@@ -937,7 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [parseResult] = await Promise.all([
         parseSotFile(sotFileData, sotFileName || "sot-file").catch(() => ({ text: "", parsed: {} })),
         pool.query(
-          `UPDATE dealers SET sot_file_name = $1, sot_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+          `UPDATE dealers SET sot_file_name = $1, sot_file_data = $2, sot_on_file = true, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
           [sotFileName || "sot-file", sotFileData, id]
         ),
       ]);
@@ -983,7 +986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [parseResult] = await Promise.all([
         parseFflFile(fflFileData, fflFileName || "ffl-file").catch(() => ({ text: "", parsed: {} })),
         pool.query(
-          `UPDATE dealers SET ffl_file_name = $1, ffl_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+          `UPDATE dealers SET ffl_file_name = $1, ffl_file_data = $2, ffl_on_file = true, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
           [fflFileName || "ffl-file", fflFileData, id]
         ),
       ]);
@@ -1022,7 +1025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { salesTaxFormName, salesTaxFormData } = req.body || {};
       await pool.query(
-        `UPDATE dealers SET sales_tax_form_name = $1, sales_tax_form_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        `UPDATE dealers SET sales_tax_form_name = $1, sales_tax_form_data = $2, tax_form_on_file = true, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
         [salesTaxFormName || null, salesTaxFormData || null, id]
       );
       return res.json({ ok: true });

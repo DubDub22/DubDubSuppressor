@@ -29,6 +29,8 @@ export const dealers = pgTable("dealers", {
   sotReceiptDate: text("sot_receipt_date"),   // e.g. "July 03, 2025"
   sotFileName: text("sot_file_name"),
   sotFileData: text("sot_file_data"),         // base64
+  sotOnFile: boolean("sot_on_file").default(false),
+  sotExpiryDate: text("sot_expiry_date"),     // ISO date string (YYYY-MM-DD)
 
   // FFL info
   fflLicenseNumber: text("ffl_license_number"),
@@ -36,6 +38,8 @@ export const dealers = pgTable("dealers", {
   fflExpiry: text("ffl_expiry"),
   fflFileName: text("ffl_file_name"),
   fflFileData: text("ffl_file_data"),
+  fflOnFile: boolean("ffl_on_file").default(false),
+  fflExpiryDate: text("ffl_expiry_date"),     // ISO date string (YYYY-MM-DD)
 
   // Tax status
   taxExempt: boolean("tax_exempt").default(false),
@@ -43,6 +47,7 @@ export const dealers = pgTable("dealers", {
   salesTaxId: text("sales_tax_id"),           // state sales tax exemption ID
   salesTaxFormData: text("sales_tax_form_data"), // base64 uploaded form
   salesTaxFormName: text("sales_tax_form_name"),
+  taxFormOnFile: boolean("tax_form_on_file").default(false),
 
   // Metadata
   notes: text("notes"),
