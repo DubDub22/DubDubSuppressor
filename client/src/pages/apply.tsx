@@ -374,7 +374,7 @@ function PendingUpload(props: { fflNumber: string }) {
 
 // ─── Dealer Form (verified FFL — place order or inquiry) ───────────────────────
 
-function DealerForm(props: { fflNumber: string; dealerName?: string; email?: string; phone?: string; expiry?: string }) {
+function DealerForm(props: { fflNumber: string; dealerName?: string; email?: string; phone?: string }) {
   const { toast } = useToast();
   const [orderKind, setOrderKind] = useState<"inquiry" | "demo" | "stocking">("inquiry");
   const [quantityCans, setQuantityCans] = useState("5");
@@ -431,7 +431,7 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
       contactName: "",
       email: props.email || "",
       confirmEmail: "",
-      fflExpiry: props.expiry || "",
+      fflExpiry: "",
       ein: "",
       contactPhone: props.phone || "",
       address: "",
@@ -535,33 +535,7 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
           </div>
         </div>
 
-        {/* ── Contact fields ── */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <FormField control={form.control} name="dealerName" render={({ field }) => (
-            <FormItem><FormLabel>Dealer / FFL Name</FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
-          )} />
-          <FormField control={form.control} name="contactName" render={({ field }) => (
-            <FormItem><FormLabel>Contact Person</FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
-          )} />
-        </div>
-
-        {/* ── Email / Phone ── */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <FormField control={form.control} name="email" render={({ field }) => (
-            <FormItem><FormLabel>Contact Email</FormLabel><FormControl><Input {...field} type="email" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
-          )} />
-          <FormField control={form.control} name="confirmEmail" render={({ field }) => (
-            <FormItem><FormLabel>Confirm Email</FormLabel><FormControl><Input {...field} type="email" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
-          )} />
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4">
-          <FormField control={form.control} name="contactPhone" render={({ field }) => (
-            <FormItem><FormLabel>Contact Phone <span className="text-xs text-muted-foreground font-normal">(optional)</span></FormLabel><FormControl><Input {...field} type="tel" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
-          )} />
-        </div>
-
-        {/* ── FFL Number — 6-segment display (read-only, pre-populated from DB) ── */}
+        {/* ── FFL Number — 6-segment entry ── */}
         <div className="space-y-2">
           <label className="text-sm font-medium">FFL Number</label>
           <div className="flex items-center gap-1 font-mono text-sm">
@@ -631,7 +605,33 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
               placeholder="XXXXX"
             />
           </div>
-          <p className="text-xs text-muted-foreground">Pre-populated from your FFL on file. Edit if needed.</p>
+          <p className="text-xs text-muted-foreground">Edit if needed.</p>
+        </div>
+
+        {/* ── Contact fields ── */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <FormField control={form.control} name="dealerName" render={({ field }) => (
+            <FormItem><FormLabel>Dealer / FFL Name</FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="contactName" render={({ field }) => (
+            <FormItem><FormLabel>Contact Person</FormLabel><FormControl><Input {...field} className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+        </div>
+
+        {/* ── Email / Phone ── */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <FormField control={form.control} name="email" render={({ field }) => (
+            <FormItem><FormLabel>Contact Email</FormLabel><FormControl><Input {...field} type="email" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="confirmEmail" render={({ field }) => (
+            <FormItem><FormLabel>Confirm Email</FormLabel><FormControl><Input {...field} type="email" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <FormField control={form.control} name="contactPhone" render={({ field }) => (
+            <FormItem><FormLabel>Contact Phone <span className="text-xs text-muted-foreground font-normal">(optional)</span></FormLabel><FormControl><Input {...field} type="tel" className="bg-card border-border" /></FormControl><FormMessage /></FormItem>
+          )} />
         </div>
 
         {/* ── FFL Expiry / EIN ── */}
@@ -716,7 +716,6 @@ export default function ApplyPage() {
   const dealerName = params.get("name") || "";
   const email = params.get("email") || "";
   const phone = params.get("phone") || "";
-  const expiry = params.get("expiry") || "";
   const pending = params.get("pending") === "1";
 
   if (!ffl) {
@@ -762,7 +761,7 @@ export default function ApplyPage() {
             {pending ? (
               <PendingUpload fflNumber={ffl} />
             ) : (
-              <DealerForm fflNumber={ffl} dealerName={dealerName} email={email} phone={phone} expiry={expiry} />
+              <DealerForm fflNumber={ffl} dealerName={dealerName} email={email} phone={phone} />
             )}
           </motion.div>
         </div>
