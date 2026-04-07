@@ -18,6 +18,7 @@ const SALES_EMAIL = "info@dubdub22.com";
 const ORDER_EMAIL = "orders@dubdub22.com";
 const WARRANTY_EMAIL = "warranty@dubdub22.com";
 const CONTACT_EMAIL = "contact@dubdub22.com";
+const INVOICE_EMAIL = "invoice@dubdub22.com";
 const BCC_EMAIL = "info@dubdub22.com";
 const GMAIL_TOKEN_PATH = "/home/dubdub/DubDub-Hub/gmail_token.json";
 const ENV_PATH = "/home/dubdub/DubDub-Hub/.env";
@@ -2267,6 +2268,119 @@ Please visit https://dubdub22.com/dealers to submit a new, valid FFL/SOT.
       return res.json({ ok: true });
     } catch (err: any) {
       console.error("tax_form_deny_error", err);
+      return res.status(500).json({ ok: false, error: err?.message || "server_error" });
+    }
+  });
+
+  // ── Manual Retail Invoice ──────────────────────────────────────────────────
+  app.post("/api/admin/retail-invoice", requireAdmin, async (req, res) => {
+    try {
+      const { customerName, customerEmail, customerPhone, customerAddress, customerCity, customerState, customerZip } = req.body || {};
+      if (!customerName) {
+        return res.status(400).json({ ok: false, error: "customer_name_required" });
+      }
+
+      // Get next invoice number from shared counter
+      const counterResult = await pool.query(
+        `INSERT INTO invoice_counter (id, last_number) VALUES (1, COALESCE((SELECT last_number FROM invoice_counter WHERE id = 1), 0) + 1)
+         ON CONFLICT (id) DO UPDATE SET last_number = invoice_counter.last_number + 1
+         RETURNING last_number`
+      );
+      const invoiceNum = counterResult.rows[0].last_number;
+      const invoiceNumber = `INV-${String(invoiceNum).padStart(4, "0")}`;
+
+      // Invoice amounts
+      const quantity = 1;
+      const unitPrice = 129.0;
+      const subtotal = quantity * unitPrice;
+      const taxRate = 0.0825;
+      const taxAmount = parseFloat((subtotal * taxRate).toFixed(2));
+      const total = subtotal + taxAmount;
+
+      // Generate PDF via Python script
+      let pdfPath = null;
+      try {
+        const args = JSON.stringify({
+          invoiceNumber,
+          customerName,
+          customerEmail: customerEmail || "",
+          customerPhone: customerPhone || "",
+          customerAddress: customerAddress || "",
+          customerCity: customerCity || "",
+          customerState: customerState || "",
+          customerZip: customerZip || "",
+          quantity,
+          unitPrice,
+          subtotal,
+          taxAmount,
+          totalAmount: total,
+          isRetail: true,
+        });
+        const pdfOut = execSync(`/home/dubdub/DubDub-Hub/venv/bin/python -c "
+import sys, json, os
+sys.path.insert(0, '/home/dubdub/DubDub-Hub')
+from bot.services.invoice_generator import generate_pdf
+params = json.loads(sys.argv[1])
+pdf_path = generate_pdf(**params)
+print(pdf_path)
+" '${args}'`, { encoding: "utf8" }).trim();
+        if (pdfOut && fs.existsSync(pdfOut.trim())) {
+          pdfPath = pdfOut.trim();
+        }
+      } catch (e) {
+        console.warn("PDF generation failed, continuing without PDF:", e.message);
+      }
+
+      // Save invoice record
+      const insertResult = await pool.query(
+        `INSERT INTO invoices
+           (invoice_number, dealer_id, is_retail, retail_customer_name, retail_customer_email,
+            retail_customer_phone, retail_customer_address, retail_customer_city,
+            retail_customer_state, retail_customer_zip,
+            quantity, unit_price, subtotal, tax_rate, tax_amount, total_amount, pdf_path, status, sent_at)
+         VALUES ($1, 0, true, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'sent', NOW())
+         RETURNING id`,
+        [invoiceNumber, customerName, customerEmail || null, customerPhone || null,
+         customerAddress || null, customerCity || null, customerState || null, customerZip || null,
+         quantity, unitPrice, subtotal, taxRate, taxAmount, total, pdfPath]
+      );
+      const invoiceId = insertResult.rows[0].id;
+
+      // Build email
+      const emailBody = [
+        `INVOICE: ${invoiceNumber}`,
+        ``,
+        `Customer: ${customerName}`,
+        customerEmail ? `Email: ${customerEmail}` : null,
+        customerPhone ? `Phone: ${customerPhone}` : null,
+        customerAddress ? `Address: ${customerAddress}` : null,
+        [customerCity, customerState, customerZip].filter(Boolean).join(", ") || null,
+        ``,
+        `1 × DUBDUB22 SUPPRESSOR @ $${unitPrice.toFixed(2)} = $${subtotal.toFixed(2)}`,
+        `Sales Tax (8.25%): $${taxAmount.toFixed(2)}`,
+        ``,
+        `TOTAL: $${total.toFixed(2)}`,
+        ``,
+        `— Thomas Trevino | Double T Tactical | 469-307-8001`,
+      ].filter(Boolean).join("\n");
+
+      const attachment = pdfPath
+        ? { filename: `${invoiceNumber}.pdf`, base64Data: fs.readFileSync(pdfPath).toString("base64"), contentType: "application/pdf" }
+        : undefined;
+
+      // Email to customer (if email provided), BCC to Tom
+      const toEmail = customerEmail || "tomtrevino@doublettactical.com";
+      await sendViaGmail({
+        to: toEmail,
+        bcc: BCC_EMAIL,
+        subject: `INVOICE ${invoiceNumber} — DubDub22 Suppressor`,
+        text: emailBody,
+        attachment,
+      });
+
+      return res.json({ ok: true, invoiceNumber, invoiceId });
+    } catch (err: any) {
+      console.error("retail_invoice_error", err);
       return res.status(500).json({ ok: false, error: err?.message || "server_error" });
     }
   });

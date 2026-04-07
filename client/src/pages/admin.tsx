@@ -235,7 +235,7 @@ function fmtDate(d: string) {
 
 function SubmissionsTab({
   submissions, isLoading, search, setSearch, typeFilter, setTypeFilter,
-  sortDir, setSortDir, setDeleteTarget, setShipTarget, onFetchSubmissions
+  sortDir, setSortDir, setDeleteTarget, setShipTarget, setInvoiceTarget, onFetchSubmissions
 }: {
   submissions: Submission[]; isLoading: boolean;
   search: string; setSearch: (s: string) => void;
@@ -243,6 +243,7 @@ function SubmissionsTab({
   sortDir: "desc" | "asc"; setSortDir: (d: "desc" | "asc") => void;
   setDeleteTarget: (s: Submission | null) => void;
   setShipTarget: (s: Submission | null) => void;
+  setInvoiceTarget: (s: Submission | null) => void;
   onFetchSubmissions: () => void;
 }) {
   // Exclude warranty submissions — they go to the Warranty tab
@@ -295,7 +296,8 @@ function SubmissionsTab({
           : filtered.length === 0 ? <p className="text-center py-8 text-muted-foreground">No submissions.</p>
           : filtered.map(sub => <SubmissionCard key={sub.id} sub={sub}
             onDelete={() => setDeleteTarget(sub)}
-            onShip={() => setShipTarget(sub)} />)}
+            onShip={() => setShipTarget(sub)}
+            onInvoice={() => setInvoiceTarget(sub)} />)}
       </div>
 
       {/* Desktop table */}
@@ -316,7 +318,8 @@ function SubmissionsTab({
               : filtered.length === 0 ? <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No submissions found.</td></tr>
               : filtered.map(sub => <SubmissionRow key={sub.id} sub={sub}
                 onDelete={() => setDeleteTarget(sub)}
-                onShip={() => setShipTarget(sub)} />)}
+                onShip={() => setShipTarget(sub)}
+                onInvoice={() => setInvoiceTarget(sub)} />)}
           </tbody>
         </table>
       </div>
@@ -324,7 +327,7 @@ function SubmissionsTab({
   );
 }
 
-function SubmissionCard({ sub, onDelete, onShip }: { sub: Submission; onDelete: () => void; onShip: () => void }) {
+function SubmissionCard({ sub, onDelete, onShip, onInvoice }: { sub: Submission; onDelete: () => void; onShip: () => void; onInvoice: () => void }) {
   return (
     <div className="border border-border rounded-lg p-3 bg-card hover:bg-secondary/5">
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -372,16 +375,23 @@ function SubmissionCard({ sub, onDelete, onShip }: { sub: Submission; onDelete: 
             {sub.shippedAt && <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), "MM/dd/yy HH:mm")}</p>}
           </div>
         ) : (
-          <Button variant="outline" size="sm" className="w-full h-8 text-xs border-primary text-primary hover:bg-primary/10" onClick={onShip}>
-            Mark as Shipped
-          </Button>
+          <div className="space-y-1">
+            <Button variant="outline" size="sm" className="w-full h-8 text-xs border-primary text-primary hover:bg-primary/10" onClick={onShip}>
+              Mark as Shipped
+            </Button>
+            {sub.type === "dealer" && (
+              <Button variant="outline" size="sm" className="w-full h-8 text-xs border-green-600 text-green-600 hover:bg-green-50" onClick={onInvoice}>
+                Send Invoice
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function SubmissionRow({ sub, onDelete, onShip }: { sub: Submission; onDelete: () => void; onShip: () => void }) {
+function SubmissionRow({ sub, onDelete, onShip, onInvoice }: { sub: Submission; onDelete: () => void; onShip: () => void; onInvoice: () => void }) {
   return (
     <tr className="border-b border-border hover:bg-secondary/10">
       <td className="px-3 py-3 whitespace-nowrap text-muted-foreground text-xs font-mono">{fmtDate(sub.createdAt)}</td>
@@ -424,9 +434,16 @@ function SubmissionRow({ sub, onDelete, onShip }: { sub: Submission; onDelete: (
             {sub.shippedAt && <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), "MM/dd/yy HH:mm")}</p>}
           </div>
         ) : (
-          <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-primary text-primary hover:bg-primary/10" onClick={onShip}>
-            Mark Shipped
-          </Button>
+          <div className="space-y-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-primary text-primary hover:bg-primary/10" onClick={onShip}>
+              Mark Shipped
+            </Button>
+            {sub.type === "dealer" && (
+              <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-green-600 text-green-600 hover:bg-green-50 w-full mt-1" onClick={onInvoice}>
+                Send Invoice
+              </Button>
+            )}
+          </div>
         )}
       </td>
       <td className="px-3 py-3">
@@ -1473,6 +1490,144 @@ function AddDealerDialog({ open, onClose, onAdd }: { open: boolean; onClose: () 
             </DialogFooter>
           </form>
         </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Invoice Dialog ─────────────────────────────────────────────────────────────
+function InvoiceDialog({ sub, open, onClose }: {
+  sub: Submission | null; open: boolean; onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [customerCity, setCustomerCity] = useState("");
+  const [customerState, setCustomerState] = useState("");
+  const [customerZip, setCustomerZip] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [sending, setSending] = useState(false);
+
+  // Pre-fill from submission when opened
+  useEffect(() => {
+    if (open && sub) {
+      setCustomerName(sub.contactName || "");
+      setCustomerEmail(sub.email || "");
+      setCustomerPhone(sub.phone || "");
+      setCustomerAddress("");
+      setCustomerCity("");
+      setCustomerState("");
+      setCustomerZip("");
+      setQuantity(sub.quantity ? parseInt(sub.quantity) || 1 : 1);
+    }
+  }, [open, sub]);
+
+  const unitPrice = 129.0;
+  const subtotal = quantity * unitPrice;
+  const taxAmount = parseFloat((subtotal * 0.0825).toFixed(2));
+  const total = subtotal + taxAmount;
+
+  const handleSend = async () => {
+    if (!customerName.trim()) { toast({ title: "Customer name required", variant: "destructive" }); return; }
+    setSending(true);
+    try {
+      const res = await fetch("/api/admin/retail-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: customerName.trim(),
+          customerEmail: customerEmail.trim() || undefined,
+          customerPhone: customerPhone.trim() || undefined,
+          customerAddress: customerAddress.trim() || undefined,
+          customerCity: customerCity.trim() || undefined,
+          customerState: customerState.trim() || undefined,
+          customerZip: customerZip.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send invoice");
+      toast({ title: "Invoice Sent!", description: `Invoice ${data.invoiceNumber} sent successfully.` });
+      onClose();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally { setSending(false); }
+  };
+
+  if (!sub) return null;
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="bg-card border-border max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold">Send Invoice — {sub.contactName || sub.email}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
+          {/* Quantity + pricing summary */}
+          <div className="bg-secondary/30 rounded-lg p-3 space-y-1">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium w-24">Quantity:</label>
+              <select
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value))}
+                className="h-8 rounded border border-border bg-background px-2 text-sm"
+              >
+                {[1, 2, 3, 4, 5, 10, 15, 20].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <span className="text-sm text-muted-foreground">× ${unitPrice.toFixed(2)} = ${subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm pl-24">
+              <span>Subtotal:</span><span>${subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm pl-24">
+              <span>Tax (8.25%):</span><span>${taxAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-sm pl-24 border-t border-border pt-1">
+              <span>Total:</span><span>${total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Customer fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-medium mb-1 block">Customer Name *</label>
+              <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Full name" />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Email</label>
+              <Input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="customer@email.com" />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Phone</label>
+              <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="512-555-0100" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium mb-1 block">Street Address</label>
+              <Input value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder="123 Main St" />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">City</label>
+              <Input value={customerCity} onChange={e => setCustomerCity(e.target.value)} placeholder="Austin" />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs font-medium mb-1 block">State</label>
+                <Input value={customerState} onChange={e => setCustomerState(e.target.value.toUpperCase().slice(0,2))} placeholder="TX" maxLength={2} />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-medium mb-1 block">ZIP</label>
+                <Input value={customerZip} onChange={e => setCustomerZip(e.target.value)} placeholder="78701" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} className="border-border">Cancel</Button>
+          <Button onClick={handleSend} disabled={sending} className="bg-green-600 hover:bg-green-700 text-white">
+            <Send className="w-4 h-4 mr-1.5" />
+            {sending ? "Sending..." : `Send Invoice — $${total.toFixed(2)}`}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -2768,6 +2923,7 @@ export default function AdminPage() {
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [deleteTarget, setDeleteTarget] = useState<Submission | null>(null);
   const [shipTarget, setShipTarget] = useState<Submission | null>(null);
+  const [invoiceTarget, setInvoiceTarget] = useState<Submission | null>(null);
   const [warrantyRequests, setWarrantyRequests] = useState<any[]>([]);
   const [warrantySearch, setWarrantySearch] = useState("");
   const [warrantyStatus, setWarrantyStatus] = useState("all");
@@ -3071,6 +3227,7 @@ export default function AdminPage() {
                 typeFilter={typeFilter} setTypeFilter={setTypeFilter}
                 sortDir={sortDir} setSortDir={setSortDir}
                 setDeleteTarget={setDeleteTarget} setShipTarget={setShipTarget}
+                setInvoiceTarget={setInvoiceTarget}
                 onFetchSubmissions={fetchSubmissions}
               />
             </CardContent>
@@ -3186,6 +3343,7 @@ export default function AdminPage() {
       </AlertDialog>
 
       <ShipDialog sub={shipTarget} open={!!shipTarget} onClose={() => setShipTarget(null)} />
+      <InvoiceDialog sub={invoiceTarget} open={!!invoiceTarget} onClose={() => setInvoiceTarget(null)} />
 
     </div>
   );
