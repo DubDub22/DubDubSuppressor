@@ -264,6 +264,7 @@ async function sendViaGmail({
   text,
   replyTo,
   attachment,
+  from,
 }: {
   to: string;
   cc?: string;
@@ -272,6 +273,7 @@ async function sendViaGmail({
   text: string;
   replyTo?: string;
   attachment?: { filename: string; base64Data: string; contentType: string };
+  from?: string;
 }) {
   if (!fs.existsSync(GMAIL_TOKEN_PATH)) throw new Error("gmail_token_missing");
   const token = JSON.parse(fs.readFileSync(GMAIL_TOKEN_PATH, "utf8"));
@@ -283,7 +285,7 @@ async function sendViaGmail({
 
   const accessToken = await refreshAccessToken(refreshToken, clientId, clientSecret);
   const raw = buildMime({
-    from: `DubDub22 Forms <${sender}>`,
+    from: from || `DubDub22 Forms <${sender}>`,
     to,
     cc,
     bcc,
@@ -1337,6 +1339,7 @@ DubDub22 Minions`;
         sendViaGmail({
           to: SALES_EMAIL,
           bcc: BCC_EMAIL,
+          from: `DubDub22 Inquiries <${sender}>`,
           subject: `DubDub22 ${isInquiry ? 'Dealer Inquiry' : 'Dealer Order'} - ${bizName}`,
           text: body,
           replyTo: email,
@@ -1432,6 +1435,7 @@ DubDub22 Minions`;
           await sendViaGmail({
             to: email,
             bcc: BCC_EMAIL,
+            from: isInquiry ? `DubDub22 Inquiries <${sender}>` : `DubDub22 Orders <${sender}>`,
             subject: `We Received Your DubDub22 ${isInquiry ? 'Inquiry' : 'Order'}`,
             text: autoReplyLines.join("\n"),
             attachment,
@@ -1582,6 +1586,7 @@ DubDub22 Minions`;
       await sendViaGmail({
         to: emailTo,
         bcc: BCC_EMAIL,
+        from: isInfo ? `DubDub22 Inquiries <${sender}>` : `DubDub22 Orders <${sender}>`,
         subject: `DubDub22 ${subjectLine}`,
         text: bodyLines.join("\n"),
         replyTo: email,
@@ -1664,6 +1669,7 @@ DubDub22 Minions`;
           await sendViaGmail({
             to: dealerEmail,
             bcc: BCC_EMAIL,
+            from: `DubDub22 Inquiries <${sender}>`,
             subject: `DubDub22 Customer Interest - ${dealer.business_name}`,
             text: [
               `A customer has inquired about the DubDub22 suppressor through our web site and selected you as their preferred dealer. In order to help our dealers maximize profits, we don't cut you out of the sale. Our products are only available through dealers. Please visit us at dubdub22.com to order a demo unit or a stocking order for your store.`,
@@ -1692,6 +1698,7 @@ DubDub22 Minions`;
           await sendViaGmail({
             to: email,
             bcc: BCC_EMAIL,
+            from: `DubDub22 Inquiries <${sender}>`,
             subject: `We Received Your DubDub22 Inquiry`,
             text: [
               `Thank you for inquiring about the DubDub22 Suppressor. We appreciate you looking at our innovative product.`,
@@ -1949,6 +1956,7 @@ DubDub22 Minions`;
       await sendViaGmail({
         to: dealer.email,
         bcc: BCC_EMAIL,
+        from: `DubDub22 Documents <${sender}>`,
         subject: `Action Required — DubDub22 Tax Form Upload`,
         text: [
           `Hi ${dealer.contact_name || dealer.business_name},`,
@@ -2080,6 +2088,7 @@ Please visit https://dubdub22.com/dealers to submit a new, valid FFL/SOT.
       await sendViaGmail({
         to: dealer.rows[0].email,
         bcc: BCC_EMAIL,
+        from: `DubDub22 Documents <${sender}>`,
         subject: `DubDub22 FFL/SOT Verification - Action Required`,
         text: emailText,
       });
@@ -2241,6 +2250,7 @@ Please visit https://dubdub22.com/dealers to submit a new, valid FFL/SOT.
       await sendViaGmail({
         to: record.email,
         bcc: BCC_EMAIL,
+        from: `DubDub22 Documents <${sender}>`,
         subject: `Action Required — DubDub22 Tax Form Update`,
         text: [
           `Hi ${record.contact_name || record.business_name},`,
@@ -2422,6 +2432,7 @@ print(pdf_path)
       await sendViaGmail({
         to: toEmail,
         bcc: BCC_EMAIL,
+        from: `DubDub22 Orders <${sender}>`,
         subject: `INVOICE ${invoiceNumber} — DubDub22 Suppressor`,
         text: emailBody,
         attachment,
