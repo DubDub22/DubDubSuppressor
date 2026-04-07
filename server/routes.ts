@@ -1739,7 +1739,16 @@ DubDub22 Minions`;
   app.get("/api/admin/retail-inquiries", requireAdmin, async (req, res) => {
     try {
       const { search, status } = req.query;
-      let query = `SELECT ri.*, d.business_name as dealer_name FROM retail_inquiries ri LEFT JOIN dealers d ON ri.dealer_id = d.id WHERE 1=1`;
+      let query = `SELECT ri.*,
+        d.business_name as dealer_name,
+        d.ffl_on_file as dealer_ffl_on_file,
+        d.ffl_expiry_date as dealer_ffl_expiry,
+        d.sot_on_file as dealer_sot_on_file,
+        d.sot_expiry_date as dealer_sot_expiry,
+        d.ffl_license_number as dealer_ffl_license_number
+        FROM retail_inquiries ri
+        LEFT JOIN dealers d ON ri.dealer_id = d.id
+        WHERE 1=1`;
       const params: any[] = [];
       let idx = 1;
 
@@ -1797,13 +1806,30 @@ DubDub22 Minions`;
       let idx = 1;
 
       // Submissions: dealer leads (type=dealer, has_ordered_demo=false)
-      let query = `SELECT 'submission' as source, id::text as id, contact_name, business_name, email, phone, NULL::text as message, created_at::timestamp as created_at FROM submissions WHERE type = 'dealer' AND has_ordered_demo = 'false'`;
+      // Join with dealers on FFL license number to pull doc expiry info
+      let query = `SELECT
+        'submission' as source,
+        s.id::text as id,
+        s.contact_name,
+        s.business_name,
+        s.email,
+        s.phone,
+        NULL::text as message,
+        s.created_at::timestamp as created_at,
+        d.ffl_on_file as dealer_ffl_on_file,
+        d.ffl_expiry_date as dealer_ffl_expiry,
+        d.sot_on_file as dealer_sot_on_file,
+        d.sot_expiry_date as dealer_sot_expiry,
+        d.ffl_license_number as dealer_ffl_license_number
+        FROM submissions s
+        LEFT JOIN dealers d ON UPPER(REPLACE(REPLACE(d.ffl_license_number, '-', ''), ' ', '')) = UPPER(REPLACE(REPLACE(s.ffl_license_number, '-', ''), ' ', ''))
+        WHERE s.type = 'dealer' AND s.has_ordered_demo = 'false'`;
       if (search) {
-        query += ` AND (contact_name ILIKE $${idx} OR business_name ILIKE $${idx} OR email ILIKE $${idx})`;
+        query += ` AND (s.contact_name ILIKE $${idx} OR s.business_name ILIKE $${idx} OR s.email ILIKE $${idx})`;
         params.push(`%${search}%`);
         idx++;
       }
-      query += ` ORDER BY created_at DESC`;
+      query += ` ORDER BY s.created_at DESC`;
 
       const result = await pool.query(query, params);
       return res.json({ ok: true, data: result.rows });

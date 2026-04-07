@@ -1663,6 +1663,7 @@ function RetailInquiriesTab({
                 </td>
                 <td className="px-3 py-3">
                   <div className="text-sm">{r.dealer_name || "—"}</div>
+                  <DocCautionBanner dealer={r} />
                 </td>
                 <td className="px-3 py-3">
                   <div className="text-xs max-w-[250px] truncate">{r.message || "—"}</div>
@@ -1698,6 +1699,7 @@ function RetailInquiriesTab({
               <p className="text-xs text-muted-foreground">{r.email}</p>
               {r.phone && <p className="text-xs text-muted-foreground">{r.phone}</p>}
               {r.dealer_name && <p className="text-xs px-1.5 py-0.5 bg-secondary rounded inline-block">{r.dealer_name}</p>}
+              <DocCautionBanner dealer={r} />
             </div>
             {r.message && <p className="text-xs border-t border-border pt-2 mt-2">{r.message}</p>}
             {r.admin_notes && <p className="text-xs text-muted-foreground italic mt-1">Note: {r.admin_notes}</p>}
@@ -1865,10 +1867,28 @@ function WarrantyTab({
   );
 }
 
+// ── Doc Expiry Caution Banner ─────────────────────────────────────────────
+
+function DocCautionBanner({ dealer }: { dealer: any }) {
+  const now = new Date();
+  const fflExpired = !dealer.dealer_ffl_on_file || (dealer.dealer_ffl_expiry && new Date(dealer.dealer_ffl_expiry) < now);
+  const sotExpired = !dealer.dealer_sot_on_file || (dealer.dealer_sot_expiry && new Date(dealer.dealer_sot_expiry) < now);
+  if (!fflExpired && !sotExpired) return null;
+  return (
+    <div className="rounded border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/30 px-2 py-1 mt-1.5 text-xs text-yellow-700 dark:text-yellow-300 flex items-center gap-1.5">
+      <span className="font-semibold">⚠️ EXPIRED</span>
+      {!dealer.dealer_ffl_on_file || (dealer.dealer_ffl_expiry && new Date(dealer.dealer_ffl_expiry) < now) && <span>FFL {!dealer.dealer_ffl_on_file ? "missing" : "expired"}{dealer.dealer_ffl_expiry ? ` (${dealer.dealer_ffl_expiry})` : ""}</span>}
+      {!dealer.dealer_sot_on_file || (dealer.dealer_sot_expiry && new Date(dealer.dealer_sot_expiry) < now) && <span>SOT {!dealer.dealer_sot_on_file ? "missing" : "expired"}{dealer.dealer_sot_expiry ? ` (${dealer.dealer_sot_expiry})` : ""}</span>}
+    </div>
+  );
+}
+
+// ── Dealer Inquiries Tab ───────────────────────────────────────────────────
+
 function DealerInquiriesTab({
   submissions, search, setSearch, onDelete
 }: {
-  submissions: (Submission & { source?: string })[];
+  submissions: (Submission & { source?: string; dealer_ffl_on_file?: boolean; dealer_ffl_expiry?: string; dealer_sot_on_file?: boolean; dealer_sot_expiry?: string; dealer_ffl_license_number?: string })[];
   search: string;
   setSearch: (s: string) => void;
   onDelete: (sub: Submission & { source?: string }) => void;
@@ -1911,6 +1931,7 @@ function DealerInquiriesTab({
                 <p className="text-xs text-muted-foreground">{sub.contactName || "—"}</p>
                 <p className="text-xs text-muted-foreground">{sub.email || "—"}</p>
                 {sub.phone && <p className="text-xs text-muted-foreground">{sub.phone}</p>}
+                <DocCautionBanner dealer={sub} />
               </div>
             </div>
           ))}
@@ -1933,7 +1954,10 @@ function DealerInquiriesTab({
               : filtered.map(sub => (
                 <tr key={sub.id} className="border-b border-border hover:bg-secondary/10">
                   <td className="px-3 py-2 text-muted-foreground font-mono text-xs">{fmtDate(sub.createdAt)}</td>
-                  <td className="px-3 py-2 font-medium">{sub.businessName || "—"}</td>
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{sub.businessName || "—"}</div>
+                    <DocCautionBanner dealer={sub} />
+                  </td>
                   <td className="px-3 py-2">{sub.contactName || "—"}</td>
                   <td className="px-3 py-2">{sub.email || "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{sub.phone || "—"}</td>
@@ -2791,6 +2815,11 @@ export default function AdminPage() {
         phone: r.phone,
         message: r.message,
         createdAt: r.created_at,
+        dealer_ffl_on_file: r.dealer_ffl_on_file,
+        dealer_ffl_expiry: r.dealer_ffl_expiry,
+        dealer_sot_on_file: r.dealer_sot_on_file,
+        dealer_sot_expiry: r.dealer_sot_expiry,
+        dealer_ffl_license_number: r.dealer_ffl_license_number,
       }));
       setDealerInquiries(normalized);
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
