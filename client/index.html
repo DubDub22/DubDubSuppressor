@@ -25,6 +25,100 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Rajdhani:wght@500;600;700&display=swap"
     rel="stylesheet">
+
+  <!-- Organization Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": "https://dubdub22.com/#organization",
+    "name": "Double T Tactical",
+    "url": "https://dubdub22.com",
+    "logo": "https://dubdub22.com/favicon.png",
+    "description": "Double T Tactical manufactures the DubDub22, a groundbreaking 3D-printed 22LR suppressor featuring advanced pressure-release technology.",
+    "foundingLocation": {
+      "@type": "Place",
+      "name": "Florisville, TX"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "email": "info@dubdub22.com",
+      "url": "https://dubdub22.com/contact",
+      "contactType": "customer service",
+      "availableLanguage": "English"
+    },
+    "sameAs": [
+      "https://www.instagram.com/dubdub22",
+      "https://www.facebook.com/dubdub22",
+      "https://www.youtube.com/@dubdub22"
+    ]
+  }
+  </script>
+
+  <!-- Product Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "DubDub22 Suppressor",
+    "description": "A groundbreaking 3D-printed 22LR suppressor featuring advanced pressure-release technology and unparalleled manufacturing innovation.",
+    "image": "https://dubdub22.com/og-image.png",
+    "url": "https://dubdub22.com",
+    "brand": {
+      "@type": "Brand",
+      "name": "DubDub22",
+      "manufacturer": {
+        "@id": "https://dubdub22.com/#organization"
+      }
+    },
+    "manufacturer": {
+      "@id": "https://dubdub22.com/#organization"
+    },
+    "category": "Firearm Suppressor",
+    "offers": {
+      "@type": "Offer",
+      "url": "https://dubdub22.com/order",
+      "availability": "https://schema.org/InStock",
+      "priceCurrency": "USD",
+      "description": "Available through authorized dealers. Contact us for pricing and dealer locator."
+    },
+    "additionalProperty": [
+      {
+        "@type": "PropertyValue",
+        "name": "Caliber",
+        "value": "22LR"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Technology",
+        "value": "3D Printed, Pressure-Release"
+      }
+    ]
+  }
+  </script>
+
+  <!-- WebSite Schema with Search Box -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": "https://dubdub22.com/#website",
+    "url": "https://dubdub22.com",
+    "name": "DubDub22 - Next-Gen 3D Printed Suppressor",
+    "description": "The DubDub22 is a groundbreaking 3D-printed 22LR suppressor.",
+    "publisher": {
+      "@id": "https://dubdub22.com/#organization"
+    },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://dubdub22.com/dealers?search={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
 </head>
 
 <body>
