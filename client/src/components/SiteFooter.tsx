@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, Mail, ExternalLink } from "lucide-react";
+import { Mail, ExternalLink } from "lucide-react";
 
 const complianceLinks = [
   { label: "Privacy Policy", href: "/privacy" },
@@ -47,18 +47,7 @@ export default function SiteFooter() {
               Contact
             </h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <Phone size={14} className="text-primary" />
-                <a href="tel:+14693078001" className="hover:text-primary transition-colors">
-                  469-307-8001
-                </a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail size={14} className="text-primary" />
-                <a href="mailto:sales@doublettactical.com" className="hover:text-primary transition-colors">
-                  sales@doublettactical.com
-                </a>
-              </li>
+
               <li className="flex items-center gap-2">
                 <Mail size={14} className="text-primary" />
                 <a href="mailto:info@dubdub22.com" className="hover:text-primary transition-colors">
