@@ -2609,10 +2609,7 @@ export default function AdminPage() {
       if (res.status === 403) { setAuthStatus("needs_pin"); setIsLoading(false); return; }
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      const normalized = (Array.isArray(data.data) ? data.data : []).map((s: any) => ({
-        ...s,
-        createdAt: s.created_at, // normalize snake_case from raw SQL
-      }));
+      const normalized = Array.isArray(data.data) ? data.data : [];
       setSubmissions(normalized);
       setAuthStatus("authorized");
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
