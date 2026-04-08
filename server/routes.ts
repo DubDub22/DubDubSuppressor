@@ -560,17 +560,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── Dealers API ───────────────────────────────────────────────────────────
 
-  // Public: Dealer map data (no PII — name, city, state, zip, tier, verified, email, phone)
+  // Public: Dealer map data (no PII — name, city, state, zip, tier, verified, phone)
+  // Preferred dealers: show curated phone if submitted, else FFL voicePhone
+  // Standard dealers: show FFL voicePhone
   app.get("/api/dealers/map", async (req, res) => {
     try {
       const result = await pool.query(`
-        SELECT id, business_name, city, state, zip, tier, verified, email, phone
+        SELECT id, business_name, city, state, zip, tier, verified, phone, ffl_license_number
         FROM dealers
         ORDER BY
           CASE WHEN tier = 'Preferred' THEN 0 ELSE 1 END,
           state, city
       `);
-      return res.json({ ok: true, data: result.rows });
+      const data = result.rows.map(row => {
+        const ffl = row.ffl_license_number ? validateFFL(row.ffl_license_number) : null;
+        const voicePhone = ffl?.voicePhone || null;
+        // Preferred dealers: curated phone takes priority; fall back to FFL voicePhone
+        const displayPhone = row.tier === "Preferred" && row.phone ? row.phone : (row.phone || voicePhone);
+        return { ...row, voicePhone, displayPhone };
+      });
+      return res.json({ ok: true, data });
     } catch (err: any) {
       console.error("get_dealers_map_error", err);
       return res.status(500).json({ ok: false, error: "failed_to_fetch" });
@@ -597,7 +606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch all dealers that have coordinates in the same state as the search zip
       const searchState = searchCoords.state;
       const result = await pool.query(`
-        SELECT id, business_name, city, state, zip, tier, verified, email, phone, lat, lng
+        SELECT id, business_name, city, state, zip, tier, verified, phone, lat, lng, ffl_license_number
         FROM dealers
         WHERE lat IS NOT NULL AND lng IS NOT NULL AND state = $1
       `, [searchState]);
@@ -605,7 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const R = 3958.8; // Earth radius in miles
       const DEG = Math.PI / 180;
 
-      // Compute haversine distance for all dealers
+      // Compute haversine distance for all dealers, enrich with phone
       const withDist = result.rows
         .map(row => {
           const dLat = ((row.lat as number) - lat1) * DEG;
@@ -614,7 +623,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             Math.sin(dLat / 2) ** 2 +
             Math.cos(lat1 * DEG) * Math.cos((row.lat as number) * DEG) * Math.sin(dLng / 2) ** 2;
           const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          return { ...row, _dist: Math.round(dist * 10) / 10 };
+          const ffl = row.ffl_license_number ? validateFFL(row.ffl_license_number) : null;
+          const voicePhone = ffl?.voicePhone || null;
+          const displayPhone = row.tier === "Preferred" && row.phone ? row.phone : (row.phone || voicePhone);
+          return { ...row, voicePhone, displayPhone, _dist: Math.round(dist * 10) / 10 };
         })
         .sort((a, b) => a._dist - b._dist);
 
