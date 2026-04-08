@@ -340,74 +340,76 @@ export default function DealerMap() {
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <Dialog.Root open={contactDealer?.id === preferred.id} onOpenChange={(open) => setContactDealer(open ? preferred : null)}>
-                        <Dialog.Trigger asChild>
-                          <button
-                            className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-bold px-4 py-2 rounded transition-colors cursor-pointer border-0"
-                            onClick={(e) => { e.stopPropagation(); setContactDealer(preferred); }}
-                          >
-                            <Mail className="w-3.5 h-3.5" /> Contact Dealer
-                          </button>
-                        </Dialog.Trigger>
-                        <Dialog.Portal>
-                          <Dialog.Overlay className="fixed inset-0 bg-black/60 z-50" />
-                          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-card border border-border w-full max-w-md p-6 rounded-xl shadow-2xl">
-                            <Dialog.Title className="text-xl font-bold font-display mb-1">Contact {preferred.business_name}</Dialog.Title>
-                            <Dialog.Description className="text-sm text-muted-foreground mb-4">
-                              Send a message to this dealer and we'll share your interest in the DubDub22.
-                            </Dialog.Description>
-                            <form onSubmit={async (e) => {
-                              e.preventDefault();
-                              if (!contactDealer) return;
-                              if (!contactEmail && !contactPhone) { toast({ title: "Error", description: "Please provide an email or phone number.", variant: "destructive" }); return; }
-                              setSubmitting(true);
-                              try {
-                                const res = await fetch("/api/retail-inquiry", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ dealerId: contactDealer.id, contactName, email: contactEmail, phone: contactPhone, message: contactMessage }),
-                                });
-                                const data = await res.json();
-                                if (!res.ok || !data.ok) throw new Error(data.error || "Submission failed");
-                                toast({ title: "Message sent!", description: `${contactDealer.business_name} will be in touch soon.` });
-                                setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage("");
-                              } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
-                              finally { setSubmitting(false); }
-                            }}>
-                              <div className="space-y-3">
-                                <div>
-                                  <label className="text-sm font-medium mb-1 block">Your Name *</label>
-                                  <Input required value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="John Smith" />
+                    {preferred.email && (
+                      <div className="flex gap-2 shrink-0">
+                        <Dialog.Root open={contactDealer?.id === preferred.id} onOpenChange={(open) => setContactDealer(open ? preferred : null)}>
+                          <Dialog.Trigger asChild>
+                            <button
+                              className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-bold px-4 py-2 rounded transition-colors cursor-pointer border-0"
+                              onClick={(e) => { e.stopPropagation(); setContactDealer(preferred); }}
+                            >
+                              <Mail className="w-3.5 h-3.5" /> Contact Dealer
+                            </button>
+                          </Dialog.Trigger>
+                          <Dialog.Portal>
+                            <Dialog.Overlay className="fixed inset-0 bg-black/60 z-50" />
+                            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-card border border-border w-full max-w-md p-6 rounded-xl shadow-2xl">
+                              <Dialog.Title className="text-xl font-bold font-display mb-1">Contact {preferred.business_name}</Dialog.Title>
+                              <Dialog.Description className="text-sm text-muted-foreground mb-4">
+                                Send a message to this dealer and we'll share your interest in the DubDub22.
+                              </Dialog.Description>
+                              <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (!contactDealer) return;
+                                if (!contactEmail && !contactPhone) { toast({ title: "Error", description: "Please provide an email or phone number.", variant: "destructive" }); return; }
+                                setSubmitting(true);
+                                try {
+                                  const res = await fetch("/api/retail-inquiry", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ dealerId: contactDealer.id, contactName, email: contactEmail, phone: contactPhone, message: contactMessage }),
+                                  });
+                                  const data = await res.json();
+                                  if (!res.ok || !data.ok) throw new Error(data.error || "Submission failed");
+                                  toast({ title: "Message sent!", description: `${contactDealer.business_name} will be in touch soon.` });
+                                  setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage("");
+                                } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
+                                finally { setSubmitting(false); }
+                              }}>
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="text-sm font-medium mb-1 block">Your Name *</label>
+                                    <Input required value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="John Smith" />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium mb-1 block">Your Email</label>
+                                    <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium mb-1 block">Your Phone</label>
+                                    <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(555) 555-5555" />
+                                  </div>
+                                  { !contactEmail && !contactPhone && (
+                                    <p className="text-xs text-muted-foreground">Please provide an email or phone number so the dealer can reach you.</p>
+                                  )}
+                                  <div>
+                                    <label className="text-sm font-medium mb-1 block">Message</label>
+                                    <textarea className="w-full px-3 py-2 bg-background border border-border text-sm rounded-md resize-none" rows={3} value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} placeholder="I'm interested in the DubDub22 suppressor..." />
+                                  </div>
                                 </div>
-                                <div>
-                                  <label className="text-sm font-medium mb-1 block">Your Email</label>
-                                  <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
+                                <div className="flex gap-2 mt-4 justify-end">
+                                  <Dialog.Close asChild><Button type="button" variant="outline" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}>Cancel</Button></Dialog.Close>
+                                  <Button type="submit" disabled={submitting}>{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Message"}</Button>
                                 </div>
-                                <div>
-                                  <label className="text-sm font-medium mb-1 block">Your Phone</label>
-                                  <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(555) 555-5555" />
-                                </div>
-                                { !contactEmail && !contactPhone && (
-                                  <p className="text-xs text-muted-foreground">Please provide an email or phone number so the dealer can reach you.</p>
-                                )}
-                                <div>
-                                  <label className="text-sm font-medium mb-1 block">Message</label>
-                                  <textarea className="w-full px-3 py-2 bg-background border border-border text-sm rounded-md resize-none" rows={3} value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} placeholder="I'm interested in the DubDub22 suppressor..." />
-                                </div>
-                              </div>
-                              <div className="flex gap-2 mt-4 justify-end">
-                                <Dialog.Close asChild><Button type="button" variant="outline" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}>Cancel</Button></Dialog.Close>
-                                <Button type="submit" disabled={submitting}>{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Message"}</Button>
-                              </div>
-                            </form>
-                            <Dialog.Close asChild>
-                              <button className="absolute top-4 right-4 text-muted-foreground hover:text-foreground" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}><X className="w-4 h-4" /></button>
-                            </Dialog.Close>
-                          </Dialog.Content>
-                        </Dialog.Portal>
-                      </Dialog.Root>
-                    </div>
+                              </form>
+                              <Dialog.Close asChild>
+                                <button className="absolute top-4 right-4 text-muted-foreground hover:text-foreground" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}><X className="w-4 h-4" /></button>
+                              </Dialog.Close>
+                            </Dialog.Content>
+                          </Dialog.Portal>
+                        </Dialog.Root>
+                      </div>
+                    )}
                   </Card>
                 );
               })}
@@ -451,97 +453,99 @@ export default function DealerMap() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Dialog.Root open={contactDealer?.id === dealer.id} onOpenChange={(open) => setContactDealer(open ? dealer : null)}>
-                    <Dialog.Trigger asChild>
-                      <button
-                        className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-bold px-4 py-2 rounded transition-colors cursor-pointer border-0"
-                        onClick={(e) => { e.stopPropagation(); setContactDealer(dealer); }}
-                      >
-                        <Mail className="w-3.5 h-3.5" />
-                        Contact Dealer
-                      </button>
-                    </Dialog.Trigger>
-                    <Dialog.Portal>
-                      <Dialog.Overlay className="fixed inset-0 bg-black/60 z-50" />
-                      <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-card border border-border w-full max-w-md p-6 rounded-xl shadow-2xl">
-                        <Dialog.Title className="text-xl font-bold font-display mb-1">Contact {dealer.business_name}</Dialog.Title>
-                        <Dialog.Description className="text-sm text-muted-foreground mb-4">
-                          Send a message to this dealer and we'll share your interest in the DubDub22.
-                        </Dialog.Description>
-                        <form onSubmit={async (e) => {
-                          e.preventDefault();
-                          if (!contactDealer) return;
-                          if (!contactEmail && !contactPhone) { toast({ title: "Error", description: "Please provide an email or phone number.", variant: "destructive" }); return; }
-                          setSubmitting(true);
-                          try {
-                            const res = await fetch("/api/retail-inquiry", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                dealerId: contactDealer.id,
-                                contactName,
-                                email: contactEmail,
-                                phone: contactPhone,
-                                message: contactMessage,
-                              }),
-                            });
-                            const data = await res.json();
-                            if (!res.ok || !data.ok) throw new Error(data.error || "Submission failed");
-                            toast({ title: "Message sent!", description: `${contactDealer.business_name} will be in touch soon.` });
-                            setContactDealer(null);
-                            setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage("");
-                          } catch (err: any) {
-                            toast({ title: "Error", description: err.message, variant: "destructive" });
-                          } finally {
-                            setSubmitting(false);
-                          }
-                        }}>
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-sm font-medium mb-1 block">Your Name *</label>
-                              <Input required value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="John Smith" />
+                {dealer.email && (
+                  <div className="flex gap-2 shrink-0">
+                    <Dialog.Root open={contactDealer?.id === dealer.id} onOpenChange={(open) => setContactDealer(open ? dealer : null)}>
+                      <Dialog.Trigger asChild>
+                        <button
+                          className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-bold px-4 py-2 rounded transition-colors cursor-pointer border-0"
+                          onClick={(e) => { e.stopPropagation(); setContactDealer(dealer); }}
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          Contact Dealer
+                        </button>
+                      </Dialog.Trigger>
+                      <Dialog.Portal>
+                        <Dialog.Overlay className="fixed inset-0 bg-black/60 z-50" />
+                        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-card border border-border w-full max-w-md p-6 rounded-xl shadow-2xl">
+                          <Dialog.Title className="text-xl font-bold font-display mb-1">Contact {dealer.business_name}</Dialog.Title>
+                          <Dialog.Description className="text-sm text-muted-foreground mb-4">
+                            Send a message to this dealer and we'll share your interest in the DubDub22.
+                          </Dialog.Description>
+                          <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!contactDealer) return;
+                            if (!contactEmail && !contactPhone) { toast({ title: "Error", description: "Please provide an email or phone number.", variant: "destructive" }); return; }
+                            setSubmitting(true);
+                            try {
+                              const res = await fetch("/api/retail-inquiry", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  dealerId: contactDealer.id,
+                                  contactName,
+                                  email: contactEmail,
+                                  phone: contactPhone,
+                                  message: contactMessage,
+                                }),
+                              });
+                              const data = await res.json();
+                              if (!res.ok || !data.ok) throw new Error(data.error || "Submission failed");
+                              toast({ title: "Message sent!", description: `${contactDealer.business_name} will be in touch soon.` });
+                              setContactDealer(null);
+                              setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage("");
+                            } catch (err: any) {
+                              toast({ title: "Error", description: err.message, variant: "destructive" });
+                            } finally {
+                              setSubmitting(false);
+                            }
+                          }}>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="text-sm font-medium mb-1 block">Your Name *</label>
+                                <Input required value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="John Smith" />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium mb-1 block">Your Email</label>
+                                <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium mb-1 block">Your Phone</label>
+                                <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(555) 555-5555" />
+                              </div>
+                              { !contactEmail && !contactPhone && (
+                                <p className="text-xs text-muted-foreground">Please provide an email or phone number so the dealer can reach you.</p>
+                              )}
+                              <div>
+                                <label className="text-sm font-medium mb-1 block">Message</label>
+                                <textarea
+                                  className="w-full px-3 py-2 bg-background border border-border text-sm rounded-md resize-none"
+                                  rows={3}
+                                  value={contactMessage}
+                                  onChange={(e) => setContactMessage(e.target.value)}
+                                  placeholder="I'm interested in the DubDub22 suppressor..."
+                                />
+                              </div>
                             </div>
-                            <div>
-                              <label className="text-sm font-medium mb-1 block">Your Email</label>
-                              <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@example.com" />
+                            <div className="flex gap-2 mt-4 justify-end">
+                              <Dialog.Close asChild>
+                                <Button type="button" variant="outline" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}>Cancel</Button>
+                              </Dialog.Close>
+                              <Button type="submit" disabled={submitting}>
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Message"}
+                              </Button>
                             </div>
-                            <div>
-                              <label className="text-sm font-medium mb-1 block">Your Phone</label>
-                              <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(555) 555-5555" />
-                            </div>
-                            { !contactEmail && !contactPhone && (
-                              <p className="text-xs text-muted-foreground">Please provide an email or phone number so the dealer can reach you.</p>
-                            )}
-                            <div>
-                              <label className="text-sm font-medium mb-1 block">Message</label>
-                              <textarea
-                                className="w-full px-3 py-2 bg-background border border-border text-sm rounded-md resize-none"
-                                rows={3}
-                                value={contactMessage}
-                                onChange={(e) => setContactMessage(e.target.value)}
-                                placeholder="I'm interested in the DubDub22 suppressor..."
-                              />
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mt-4 justify-end">
-                            <Dialog.Close asChild>
-                              <Button type="button" variant="outline" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}>Cancel</Button>
-                            </Dialog.Close>
-                            <Button type="submit" disabled={submitting}>
-                              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Message"}
-                            </Button>
-                          </div>
-                        </form>
-                        <Dialog.Close asChild>
-                          <button className="absolute top-4 right-4 text-muted-foreground hover:text-foreground" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}>
-                            <X className="w-4 h-4" />
-                          </button>
-                        </Dialog.Close>
-                      </Dialog.Content>
-                    </Dialog.Portal>
-                  </Dialog.Root>
-                </div>
+                          </form>
+                          <Dialog.Close asChild>
+                            <button className="absolute top-4 right-4 text-muted-foreground hover:text-foreground" onClick={() => { setContactDealer(null); setContactName(""); setContactEmail(""); setContactPhone(""); setContactMessage(""); }}>
+                              <X className="w-4 h-4" />
+                            </button>
+                          </Dialog.Close>
+                        </Dialog.Content>
+                      </Dialog.Portal>
+                    </Dialog.Root>
+                  </div>
+                )}
               </Card>
             );
           })}

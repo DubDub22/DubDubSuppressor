@@ -566,7 +566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dealers/map", async (req, res) => {
     try {
       const result = await pool.query(`
-        SELECT id, business_name, city, state, zip, tier, verified, phone, ffl_license_number
+        SELECT id, business_name, city, state, zip, tier, verified, phone, email, ffl_license_number
         FROM dealers
         ORDER BY
           CASE WHEN tier = 'Preferred' THEN 0 ELSE 1 END,
@@ -606,7 +606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch all dealers that have coordinates in the same state as the search zip
       const searchState = searchCoords.state;
       const result = await pool.query(`
-        SELECT id, business_name, city, state, zip, tier, verified, phone, lat, lng, ffl_license_number
+        SELECT id, business_name, city, state, zip, tier, verified, phone, email, lat, lng, ffl_license_number
         FROM dealers
         WHERE lat IS NOT NULL AND lng IS NOT NULL AND state = $1
       `, [searchState]);
