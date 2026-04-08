@@ -18,6 +18,7 @@ import OrderConfirmationPage from "@/pages/order-confirmation";
 import OrderReceivedPage from "@/pages/order-received";
 import ContactPage from "@/pages/contact";
 import InTheWildPage from "@/pages/in-the-wild";
+import { Switch, Route } from "wouter";
 
 function Router() {
   return (
