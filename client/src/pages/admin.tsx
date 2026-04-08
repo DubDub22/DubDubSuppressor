@@ -227,8 +227,13 @@ function TaxBadge({ dealer }: { dealer: Dealer }) {
   return null;
 }
 
-function fmtDate(d: string) {
-  try { return format(parseISO(d), "yyyy-MM-dd HH:mm"); } catch { return d; }
+function fmtDate(d: string | Date) {
+  try {
+    const date = typeof d === "string" ? parseISO(d) : d;
+    return format(date, "yyyy-MM-dd HH:mm");
+  } catch {
+    return String(d);
+  }
 }
 
 // ── Submissions Tab ───────────────────────────────────────────────────────────
