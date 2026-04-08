@@ -1203,20 +1203,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isExisting = existing.rows.length > 0;
 
+      let dealerId: string;
       if (isExisting) {
         // Update existing record with contact info (file fields left as-is)
         await pool.query(
           `UPDATE dealers SET business_name = COALESCE(NULLIF($1, ''), business_name), contact_name = COALESCE(NULLIF($2, ''), contact_name), email = COALESCE(NULLIF($3, ''), email), phone = COALESCE(NULLIF($4, ''), phone), business_address = COALESCE(NULLIF($5, ''), business_address), city = COALESCE(NULLIF($6, ''), city), state = COALESCE(NULLIF($7, ''), state), zip = COALESCE(NULLIF($8, ''), zip), notes = COALESCE(NULLIF($9, ''), notes) WHERE id = $10`,
           [dealerName, contactName, email, phone, address, city, state, zipCode, message, existing.rows[0].id]
         );
+        dealerId = existing.rows[0].id;
       } else {
         // Create a pending dealer entry
-        await pool.query(
+        const ins = await pool.query(
           `INSERT INTO dealers (business_name, ffl_license_number, contact_name, email, phone, business_address, city, state, zip, notes, verified, source)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, 'pending_upload')`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, 'pending_upload')
+           RETURNING id`,
           [dealerName || `Pending FFL ${normalized}`, normalized, contactName || null, email || null, phone || null, address || null, city || null, state || null, zipCode || null, message || null]
         );
+        dealerId = ins.rows[0].id;
       }
+
+      // Also create a submissions entry so this appears in the Dealer Inquiries tab
+      const subIns = await pool.query(
+        `INSERT INTO submissions (type, contact_name, business_name, email, phone, ffl_license_number, description, customer_address, customer_city, customer_state, customer_zip)
+         VALUES ('dealer', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING id`,
+        [contactName || null, dealerName || null, email || null, phone || null, fflNumber, message || null, address || null, city || null, state || null, zipCode || null]
+      );
+      // Link it to the dealer
+      await pool.query(
+        `INSERT INTO dealer_submissions (dealer_id, submission_id, order_type) VALUES ($1, $2, 'inquiry')`,
+        [dealerId, subIns.rows[0].id]
+      );
 
       // Send ONE email to the dealer: all submitted info + request for FFL/SOT/tax forms, BCC Tom
       if (email) {
