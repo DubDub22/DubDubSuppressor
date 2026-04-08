@@ -8,6 +8,8 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+import { registerWildRoutes } from "./routes/wild.js";
 import session from "express-session";
 import { storage } from "./storage";
 import { uploadDealerDocuments } from "./sftp-upload";
@@ -324,6 +326,9 @@ try {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Load FFL master list
   await loadFFLMaster();
+
+  // Register "In The Wild" routes (YouTube + submission system)
+  registerWildRoutes(app);
 
   // Ensure auth tables exist
   await pool.query(`
@@ -1757,7 +1762,6 @@ DubDub22 Minions`;
         try {
           await sendViaGmail({
             to: dealerEmail,
-            bcc: BCC_EMAIL,
             from: `DubDub22 Inquiries <inquiry@dubdub22.com>`,
             subject: `DubDub22 Customer Interest - ${dealer.business_name}`,
             text: [
@@ -1786,7 +1790,6 @@ DubDub22 Minions`;
           const dealerAddress = [dealerInfo.business_address, dealerInfo.city, dealerInfo.state, dealerInfo.zip].filter(Boolean).join(", ");
           await sendViaGmail({
             to: email,
-            bcc: BCC_EMAIL,
             from: `DubDub22 Inquiries <inquiry@dubdub22.com>`,
             subject: `We Received Your DubDub22 Inquiry`,
             text: [
@@ -1809,6 +1812,34 @@ DubDub22 Minions`;
           console.error("retail_inquiry_auto_reply_error", gmailErr);
           // Don't fail the request if auto-reply fails
         }
+      }
+
+      // Send consolidated notification to DubDub22
+      try {
+        const dealerAddress = [dealerInfo.business_address, dealerInfo.city, dealerInfo.state, dealerInfo.zip].filter(Boolean).join(", ");
+        await sendViaGmail({
+          to: BCC_EMAIL,
+          from: `DubDub22 Inquiries <inquiry@dubdub22.com>`,
+          subject: `RETAIL LOCATOR INQUIRY`,
+          text: [
+            `--- Customer Information ---`,
+            ``,
+            `Name: ${contactName}`,
+            `Email: ${email}`,
+            phone ? `Phone: ${phone}` : null,
+            message ? `Message: ${message}` : null,
+            ``,
+            `--- Selected Dealer ---`,
+            ``,
+            `Dealer: ${dealerInfo.business_name}`,
+            dealerAddress ? `Address: ${dealerAddress}` : null,
+            dealerInfo.phone ? `Phone: ${dealerInfo.phone}` : null,
+            dealerInfo.email ? `Email: ${dealerInfo.email}` : null,
+          ].filter(Boolean).join("\n"),
+          replyTo: email,
+        });
+      } catch (gmailErr) {
+        console.error("retail_inquiry_notification_error", gmailErr);
       }
 
       const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
