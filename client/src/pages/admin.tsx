@@ -379,19 +379,17 @@ function SubmissionCard({ sub, onDelete, onShip, onInvoice }: { sub: Submission;
             <Button variant="outline" size="sm" className="w-full h-8 text-xs border-primary text-primary hover:bg-primary/10" onClick={onShip}>
               Mark as Shipped
             </Button>
-            {sub.type === "dealer" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className={`w-full h-8 text-xs ${(sub as any).hasInvoice
-                  ? "border-green-600 text-green-600 hover:bg-green-50"
-                  : "border-red-600 text-red-600 hover:bg-red-50"
-                }`}
-                onClick={onInvoice}
-              >
-                {(sub as any).hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className={`w-full h-8 text-xs ${(sub as any).hasInvoice
+                ? "border-green-600 text-green-600 hover:bg-green-50"
+                : "border-red-600 text-red-600 hover:bg-red-50"
+              }`}
+              onClick={onInvoice}
+            >
+              {(sub as any).hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
+            </Button>
           </div>
         )}
       </div>
@@ -413,6 +411,13 @@ function SubmissionRow({ sub, onDelete, onShip, onInvoice }: { sub: Submission; 
         <div className="text-muted-foreground text-xs"><CopyableText text={sub.email} /></div>
         {sub.phone && <div className="text-muted-foreground text-xs"><CopyableText text={sub.phone} /></div>}
         {sub.businessName && <div className="mt-1 text-xs px-1.5 py-0.5 bg-secondary rounded inline-block">{sub.businessName}</div>}
+        {sub.type === "dealer" && (
+          <div className="flex gap-1.5 mt-1 flex-wrap">
+            <span title="FFL on file" className="text-xs px-1 py-0.5 bg-blue-100 text-blue-700 rounded">FFL</span>
+            <span title="SOT on file" className="text-xs px-1 py-0.5 bg-purple-100 text-purple-700 rounded">SOT</span>
+            <span title="Tax ID on file" className="text-xs px-1 py-0.5 bg-green-100 text-green-700 rounded">Tax ID</span>
+          </div>
+        )}
       </td>
       <td className="px-3 py-3">
         {sub.type === "dealer" ? (
@@ -446,19 +451,17 @@ function SubmissionRow({ sub, onDelete, onShip, onInvoice }: { sub: Submission; 
             <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-primary text-primary hover:bg-primary/10" onClick={onShip}>
               Mark Shipped
             </Button>
-            {sub.type === "dealer" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className={`h-7 text-xs whitespace-nowrap w-full mt-1 ${(sub as any).hasInvoice
-                  ? "border-green-600 text-green-600 hover:bg-green-50"
-                  : "border-red-600 text-red-600 hover:bg-red-50"
-                }`}
-                onClick={onInvoice}
-              >
-                {(sub as any).hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-7 text-xs whitespace-nowrap w-full mt-1 ${(sub as any).hasInvoice
+                ? "border-green-600 text-green-600 hover:bg-green-50"
+                : "border-red-600 text-red-600 hover:bg-red-50"
+              }`}
+              onClick={onInvoice}
+            >
+              {(sub as any).hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
+            </Button>
           </div>
         )}
       </td>
