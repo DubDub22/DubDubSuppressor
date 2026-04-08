@@ -1461,7 +1461,9 @@ DubDub22 Minions`;
       ].filter(Boolean).join("\n");
 
       const [gmailResult, dbResult] = await Promise.all([
-        !isInquiry ? sendViaGmail({
+        // Only fire order email immediately for stocking orders — demo orders get their email
+        // after the dealer accepts terms on the order-confirmation page
+        !isInquiry && !isDemoOrder ? sendViaGmail({
           to: SALES_EMAIL,
           bcc: BCC_EMAIL,
           from: `DubDub22 Orders <orders@dubdub22.com>`,
