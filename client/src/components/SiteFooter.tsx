@@ -71,7 +71,7 @@ export default function SiteFooter() {
 
         <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} DUBDUB LLC &mdash; Floresville, TX
+            &copy; {new Date().getFullYear()} DOUBLE T TACTICAL &mdash; Floresville, TX
           </p>
           <p className="text-xs text-muted-foreground">
             dubdub22.com
