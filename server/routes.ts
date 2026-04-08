@@ -1460,11 +1460,11 @@ DubDub22 Minions`;
         message ? `\nMessage:\n${message}` : "",
       ].filter(Boolean).join("\n");
 
-      // No emails here — all order confirmation emails fire from /api/retail-order
-      // after the dealer accepts T&C on the order-confirmation page
-      const [gmailResult, dbResult] = await Promise.all([
-        Promise.resolve(null),
-        storage.createSubmission({
+      // Only create a submission for inquiries — demo/stocking orders get their submission
+      // created after T&C acceptance via /api/retail-order (prevents duplicate entries)
+      let submissionId: string | null = null;
+      if (isInquiry) {
+        const dbResult = await storage.createSubmission({
           type: "dealer",
           contactName,
           businessName: bizName,
@@ -1473,16 +1473,14 @@ DubDub22 Minions`;
           fflType: (req.body as any).fflType || null,
           quantity: quantityCans ? String(quantityCans) : null,
           description: message || null,
-          fflFileName: isInquiry ? null : (fflFileName || null),
-          fflFileData: isInquiry ? null : (fflFileData || null),
+          fflFileName: null,
+          fflFileData: null,
         }).catch(err => {
           console.error("db_save_failed", err);
           return null;
-        })
-      ]);
-
-      // Link submission to the dealer via dealer_submissions
-      const submissionId = dbResult?.id;
+        });
+        submissionId = dbResult?.id || null;
+      }
       if (submissionId && submissionId !== "unknown") {
         const orderType = isInquiry ? "inquiry" : "dealer_order";
         await pool.query(
