@@ -1764,7 +1764,7 @@ DubDub22 Minions`;
               `Phone: ${phone || "Not provided"}`,
               qty ? `Quantity: ${qty}` : null,
               ``,
-              `Tom will review your order and send an invoice via Authorize.net. You'll receive payment instructions separately.`,
+              `Tom will review your order and send a payment link shortly.`,
               ``,
               `Questions? Reply to this email or contact us at orders@dubdub22.com.`,
               ``,
