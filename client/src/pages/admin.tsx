@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, parseISO } from "date-fns";
 import {
-  Copy, Image as ImageIcon, Download, Trash2, Package,
+  Copy, Image as ImageIcon, Download, Trash2, Package, Archive,
   ChevronRight, ArrowLeft, Building2, FileText,
   Upload, Eye, X, Search, Inbox,
   MessageSquare, ShieldCheck, Phone, Files, CheckCircle, XCircle, Send,
@@ -54,6 +54,7 @@ type Submission = {
   createdAt: string;
   order_type?: string;
   archived?: boolean;
+  archived_from?: string;
 };
 
 type Dealer = {
@@ -103,7 +104,7 @@ type Dealer = {
   submissions?: Submission[];
 };
 
-type Tab = "submissions" | "warranty" | "dealer_inquiries" | "retail_inquiries" | "files" | "tax_forms";
+type Tab = "submissions" | "warranty" | "dealer_inquiries" | "retail_inquiries" | "files" | "tax_forms" | "archives";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
@@ -345,7 +346,7 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
         <div className="flex gap-1">
           {!sub.archived && (
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-orange-500" onClick={onArchive} title="Archive">
-              <Trash2 className="h-3.5 w-3.5" />
+              <Archive className="h-3.5 w-3.5" />
             </Button>
           )}
           {sub.archived && (
@@ -483,7 +484,7 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: S
         <div className="flex gap-1">
           {!sub.archived ? (
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-orange-500" onClick={onArchive} title="Archive">
-              <Trash2 className="h-3.5 w-3.5" />
+              <Archive className="h-3.5 w-3.5" />
             </Button>
           ) : (
             <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-500" onClick={onArchive} title="Unarchive">
@@ -2584,6 +2585,7 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [archivedFromFilter, setArchivedFromFilter] = useState("");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [archiveTarget, setArchiveTarget] = useState<Submission | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Submission | null>(null);
@@ -2759,11 +2761,11 @@ export default function AdminPage() {
       const isArchived = archiveTarget.archived;
       const endpoint = isArchived
         ? `/api/admin/submissions/${archiveTarget.id}/unarchive`
-        : `/api/admin/submissions/${archiveTarget.id}/archive`;
+        : `/api/admin/submissions/${archiveTarget.id}/archive${tab !== "archives" ? `?from=${tab}` : ""}`;
       const method = "PATCH";
       const res = await fetch(endpoint, { method });
       if (!res.ok) throw new Error("Archive failed");
-      setSubmissions(prev => prev.map(s => s.id === archiveTarget.id ? { ...s, archived: !isArchived } : s));
+      setSubmissions(prev => prev.map(s => s.id === archiveTarget.id ? { ...s, archived: !isArchived, archived_from: isArchived ? undefined : tab } : s));
       toast({ title: isArchived ? "Unarchived" : "Archived", description: isArchived ? "Submission restored." : "Submission moved to archived." });
     } catch { toast({ title: "Error", description: "Could not archive.", variant: "destructive" }); }
     finally { setArchiveTarget(null); }
@@ -2908,6 +2910,14 @@ export default function AdminPage() {
           >
             <FileText className="w-4 h-4 inline mr-1.5" />Tax Forms
           </button>
+          <button
+            onClick={() => { setTab("archives"); }}
+            className={`pb-3 px-3 text-sm font-medium border-b-2 transition-colors ${
+              tab === "archives" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Archives
+          </button>
         </div>
 
         {/* Tab content */}
@@ -2982,6 +2992,45 @@ export default function AdminPage() {
               <TaxFormsTab />
             </CardContent>
           </Card>
+        )}
+
+        {tab === "archives" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Archived Submissions</h2>
+              <select
+                value={archivedFromFilter}
+                onChange={e => setArchivedFromFilter(e.target.value)}
+                className="border rounded px-3 py-1.5 text-sm"
+              >
+                <option value="">All Sources</option>
+                <option value="orders">Orders</option>
+                <option value="warranty">Warranty</option>
+                <option value="dealer_inquiries">Dealer Inquiries</option>
+                <option value="retail_inquiries">Retail Inquiries</option>
+              </select>
+            </div>
+            {isLoading ? <p>Loading...</p> : (
+              <div className="space-y-3">
+                {submissions.filter(s => s.archived && (archivedFromFilter === "" || s.archived_from === archivedFromFilter)).length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No archived submissions.</p>
+                ) : (
+                  submissions
+                    .filter(s => s.archived && (archivedFromFilter === "" || s.archived_from === archivedFromFilter))
+                    .map(sub => (
+                      <SubmissionCard
+                        key={sub.id}
+                        sub={sub}
+                        onArchive={() => setArchiveTarget(sub)}
+                        onDelete={() => {}}
+                        onShip={() => {}}
+                        onInvoice={() => {}}
+                      />
+                    ))
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

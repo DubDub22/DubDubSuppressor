@@ -513,6 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trackingNumber: s.tracking_number,
         shippedAt: s.shipped_at,
         archived: s.archived,
+        archived_from: s.archived_from,
         hasInvoice: s.has_invoice,
         invoiceNumber: s.invoice_number,
         fflFileName: s.ffl_file_name,
@@ -540,7 +541,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/submissions/:id/archive", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      await storage.archiveSubmission(id);
+      const { from } = req.query as { from?: string };
+      await storage.archiveSubmission(id, from);
       return res.json({ ok: true });
     } catch (err: any) {
       console.error("archive_submission_error", err);

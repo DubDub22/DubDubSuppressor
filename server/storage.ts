@@ -68,12 +68,12 @@ export class DatabaseStorage implements IStorage {
     return result.rows;
   }
 
-  async archiveSubmission(id: string): Promise<void> {
-    await db.update(submissions).set({ archived: true }).where(eq(submissions.id, id));
+  async archiveSubmission(id: string, archivedFrom?: string): Promise<void> {
+    await db.update(submissions).set({ archived: true, archived_from: archivedFrom ?? null }).where(eq(submissions.id, id));
   }
 
   async unarchiveSubmission(id: string): Promise<void> {
-    await db.update(submissions).set({ archived: false }).where(eq(submissions.id, id));
+    await db.update(submissions).set({ archived: false, archived_from: null }).where(eq(submissions.id, id));
   }
 
   async deleteSubmission(id: string): Promise<void> {

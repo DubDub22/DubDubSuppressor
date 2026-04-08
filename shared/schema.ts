@@ -49,6 +49,7 @@ export const submissions = pgTable("submissions", {
   customerState: text("customer_state"),
   customerZip: text("customer_zip"),
   archived: boolean("archived").default(false).notNull(),
+  archived_from: text("archived_from"),
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
