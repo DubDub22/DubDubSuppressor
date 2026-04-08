@@ -345,6 +345,11 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
         </div>
         <div className="flex gap-1">
           {!sub.archived && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-red-500" onClick={onDelete} title="Delete">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {!sub.archived && (
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-orange-500" onClick={onArchive} title="Archive">
               <Archive className="h-3.5 w-3.5" />
             </Button>
@@ -482,6 +487,11 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: S
       </td>
       <td className="px-3 py-3">
         <div className="flex gap-1">
+          {!sub.archived && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={onDelete} title="Delete">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
           {!sub.archived ? (
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-orange-500" onClick={onArchive} title="Archive">
               <Archive className="h-3.5 w-3.5" />
