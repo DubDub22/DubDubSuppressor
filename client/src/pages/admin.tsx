@@ -8,7 +8,7 @@ import {
   ChevronRight, ArrowLeft, Building2, FileText,
   Upload, Eye, X, Search, Inbox,
   MessageSquare, ShieldCheck, Phone, Files, CheckCircle, XCircle, Send,
-  Hash, RefreshCw, Store
+  RefreshCw, Store
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -103,7 +103,7 @@ type Dealer = {
   submissions?: Submission[];
 };
 
-type Tab = "submissions" | "warranty" | "dealer_inquiries" | "retail_inquiries" | "files" | "tax_forms" | "serials";
+type Tab = "submissions" | "warranty" | "dealer_inquiries" | "retail_inquiries" | "files" | "tax_forms";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
@@ -2996,15 +2996,6 @@ export default function AdminPage() {
           >
             <FileText className="w-4 h-4 inline mr-1.5" />Tax Forms
           </button>
-
-          <button
-            onClick={() => { setTab("serials"); }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              tab === "serials" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Hash className="w-4 h-4 inline mr-1.5" />Serials
-          </button>
         </div>
 
         {/* Tab content */}
@@ -3077,14 +3068,6 @@ export default function AdminPage() {
           <Card className="bg-card/50 border-border">
             <CardContent className="p-4 md:p-6">
               <TaxFormsTab />
-            </CardContent>
-          </Card>
-        )}
-
-        {tab === "serials" && (
-          <Card className="bg-card/50 border-border">
-            <CardContent className="p-4 md:p-6">
-              <SerialsTab />
             </CardContent>
           </Card>
         )}
