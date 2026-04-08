@@ -2404,7 +2404,7 @@ Please visit https://dubdub22.com/dealers to submit a new, valid FFL/SOT.
         );
         if (subRow && subRow.rows.length > 0) {
           const sub = subRow.rows[0];
-          isRetail = sub.type !== 'dealer';
+          isRetail = sub.type === 'retail_order';
           subDealerId = sub.dealer_id || null;
           // Pre-fill any missing fields from submission
           customerName = customerName || sub.contact_name || "";
