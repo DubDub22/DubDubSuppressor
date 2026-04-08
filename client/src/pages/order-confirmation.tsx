@@ -28,6 +28,10 @@ export default function OrderConfirmationPage() {
   const dealerPhone = searchParams.get("phone") || "";
 
   const [accepted, setAccepted] = useState(false);
+  const [signatureName, setSignatureName] = useState("");
+  const [signatureDate] = useState(() => {
+    return new Date().toISOString().split("T")[0];
+  });
   const [accepting, setAccepting] = useState(false);
 
   const unitCount = orderType === "stocking" ? quantity : 1;
@@ -47,18 +51,35 @@ export default function OrderConfirmationPage() {
       return;
     }
 
+    if (!signatureName.trim()) {
+      toast({
+        title: "Signature Required",
+        description: "Please type your full legal name to sign.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setAccepting(true);
     try {
-      // POST terms acceptance to backend so we have a record
-      await fetch("/api/dealer-terms-accepted", {
+      // Call /api/retail-order with the same shape as the public order form,
+      // so the dealer order gets a DB record AND automatic emails sent
+      await fetch("/api/retail-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dealerName,
-          dealerEmail,
-          dealerPhone,
-          orderType,
-          quantity: unitCount,
+          intent: isStocking ? "order" : "demo",
+          contactName: dealerName,
+          email: dealerEmail,
+          phone: dealerPhone || null,
+          message: null,
+          quantity: String(unitCount),
+          fflFileName: null,
+          fflFileData: null,
+          customerAddress: null,
+          customerCity: null,
+          customerState: null,
+          customerZip: null,
         }),
       });
       // Redirect to order-received page — Tom will review and send invoice manually
@@ -290,6 +311,41 @@ export default function OrderConfirmationPage() {
               documentation will be verified prior to shipment.
             </label>
           </div>
+
+          {/* Digital signature */}
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="signatureName" className="text-sm font-medium block mb-1.5">
+                Digital Signature <span className="text-destructive">*</span>
+              </label>
+              <input
+                id="signatureName"
+                type="text"
+                value={signatureName}
+                onChange={(e) => setSignatureName(e.target.value)}
+                placeholder="Type your full legal name"
+                className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                By typing your name above, you agree this constitutes a legally binding digital signature.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="signatureDate" className="text-sm font-medium block mb-1.5">
+                Date <span className="text-destructive">*</span>
+              </label>
+              <input
+                id="signatureDate"
+                type="text"
+                value={signatureDate}
+                readOnly
+                className="w-full h-10 px-3 rounded-md border border-border bg-muted text-sm text-foreground cursor-default"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Date of acceptance (auto-populated).
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Action buttons */}
@@ -308,7 +364,7 @@ export default function OrderConfirmationPage() {
           </Button>
           <Button
             onClick={handleAccept}
-            disabled={!accepted || accepting}
+            disabled={!accepted || !signatureName.trim() || accepting}
             loading={accepting}
             className="flex-1 h-12 text-base bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-lg"
           >
