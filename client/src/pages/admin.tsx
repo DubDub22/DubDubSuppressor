@@ -2184,7 +2184,7 @@ function VerifyFflTab() {
       const res = await fetch("/api/admin/verify-ffl");
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setRecords(data.data || []);
+      setRecords(Array.isArray(data.data) ? data.data : []);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -2436,7 +2436,7 @@ function TaxFormsTab() {
       const res = await fetch("/api/admin/tax-forms");
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setForms(data.data || []);
+      setForms(Array.isArray(data.data) ? data.data : []);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -2654,7 +2654,7 @@ function SerialsTab() {
       const res = await fetch("/api/admin/label-runs");
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setRuns(data.data || []);
+      setRuns(Array.isArray(data.data) ? data.data : []);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -2971,7 +2971,7 @@ export default function AdminPage() {
       if (res.status === 403) { setAuthStatus("needs_pin"); setIsLoading(false); return; }
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setSubmissions(data.data || []);
+      setSubmissions(Array.isArray(data.data) ? data.data : []);
       setAuthStatus("authorized");
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
     finally { setIsLoading(false); }
@@ -2982,7 +2982,7 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/dealers");
       if (!res.ok) throw new Error("Failed to fetch dealers");
       const data = await res.json();
-      setDealers(data.data || []);
+      setDealers(Array.isArray(data.data) ? data.data : []);
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
   }, []);
 
@@ -2991,7 +2991,7 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/warranty-requests");
       if (!res.ok) throw new Error("Failed to fetch warranty requests");
       const data = await res.json();
-      setWarrantyRequests(data.data || []);
+      setWarrantyRequests(Array.isArray(data.data) ? data.data : []);
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
   }, []);
 
@@ -3030,7 +3030,7 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/retail-inquiries");
       if (!res.ok) throw new Error("Failed to fetch retail inquiries");
       const data = await res.json();
-      setRetailInquiries(data.data || []);
+      setRetailInquiries(Array.isArray(data.data) ? data.data : []);
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
   }, []);
 
@@ -3176,7 +3176,7 @@ export default function AdminPage() {
         {/* Tabs */}
         <div className="flex gap-1 border-b border-border overflow-x-auto">
           <button
-            onClick={() => { setTab("submissions"); setSelectedDealer(null); }}
+            onClick={() => { setTab("submissions"); }}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === "submissions" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
