@@ -499,7 +499,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const includeArchived = req.query.includeArchived === "true";
       const submissions = await storage.getSubmissions(includeArchived);
-      return res.json({ ok: true, data: submissions });
+      // Map snake_case DB columns to camelCase for frontend
+      const mapped = submissions.map((s: any) => ({
+        id: s.id,
+        type: s.type,
+        contactName: s.contact_name,
+        businessName: s.business_name,
+        email: s.email,
+        phone: s.phone,
+        quantity: s.quantity,
+        description: s.description,
+        serialNumber: s.serial_number,
+        trackingNumber: s.tracking_number,
+        shippedAt: s.shipped_at,
+        archived: s.archived,
+        hasInvoice: s.has_invoice,
+        invoiceNumber: s.invoice_number,
+        fflFileName: s.ffl_file_name,
+        fflFileData: s.ffl_file_data,
+        createdAt: s.created_at,
+      }));
+      return res.json({ ok: true, data: mapped });
     } catch (err: any) {
       console.error("fetch_submissions_error", err);
       return res.status(500).json({ ok: false, error: "failed_to_fetch" });

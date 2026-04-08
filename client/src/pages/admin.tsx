@@ -331,7 +331,7 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
     <div className={`border border-border rounded-lg p-3 bg-card hover:bg-secondary/5 ${sub.archived ? "opacity-60 bg-secondary/5" : ""}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`px-2 py-0.5 rounded text-xs font-bold ${sub.type === "dealer" ? "bg-orange-500 text-white" : "bg-red-500 text-white"}`}>
+          <span className={`px-2 py-0.5 rounded text-xs font-bold ${sub.type === "dealer" || sub.type === "dealer_order" ? "bg-orange-500 text-white" : "bg-red-500 text-white"}`}>
             {sub.type.toUpperCase()}
           </span>
           {sub.archived && <span className="px-1.5 py-0.5 bg-gray-400 text-white text-xs rounded">Archived</span>}
