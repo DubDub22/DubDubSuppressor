@@ -538,6 +538,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceNumber: s.invoice_number,
         fflFileName: s.ffl_file_name,
         fflFileData: s.ffl_file_data,
+        sotFileName: s.sot_file_name,
+        sotFileData: s.sot_file_data,
+        taxFormName: s.tax_form_name,
+        taxFormData: s.tax_form_data,
         createdAt: s.created_at,
       }));
       return res.json({ ok: true, data: mapped });
