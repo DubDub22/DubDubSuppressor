@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
