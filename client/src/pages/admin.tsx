@@ -190,6 +190,70 @@ function FileDownload({ fileName, fileData }: { fileName?: string; fileData?: st
   );
 }
 
+// Always-visible FFL/SOT/TAX badges — green = has file, red = missing. Badge is clickable to view or upload.
+function DocBadge({ type, fileName, fileData, submissionId }: { type: "ffl" | "sot" | "tax"; fileName?: string; fileData?: string; submissionId: string }) {
+  const hasFile = !!(fileName && fileData);
+  const label = type.toUpperCase();
+  const colors = {
+    ffl: hasFile ? "bg-green-600 text-white hover:bg-green-700" : "bg-red-500 text-white hover:bg-red-600",
+    sot: hasFile ? "bg-green-600 text-white hover:bg-green-700" : "bg-red-500 text-white hover:bg-red-600",
+    tax: hasFile ? "bg-green-600 text-white hover:bg-green-700" : "bg-red-500 text-white hover:bg-red-600",
+  };
+
+  if (hasFile) {
+    // Has file — show preview popover
+    const isPdf = fileName!.toLowerCase().endsWith(".pdf");
+    const src = isPdf ? `data:application/pdf;base64,${fileData}` : `data:image;base64,${fileData}`;
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className={`text-xs px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${colors[type]}`}>{label}</button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[480px] max-h-[520px] p-0 border-border bg-card overflow-auto">
+          {isPdf ? (
+            <iframe src={src} className="w-full rounded" style={{ height: "500px" }} title={fileName} />
+          ) : (
+            <img src={src} alt={fileName} className="w-full h-auto rounded" />
+          )}
+        </PopoverContent>
+      </Popover>
+    );
+  } else {
+    // Missing — click to upload
+    const inputId = `doc-upload-${type}-${submissionId.replace(/-/g, "")}`;
+    return (
+      <label htmlFor={inputId} className={`text-xs px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${colors[type]}`}>
+        {label}
+        <input
+          id={inputId}
+          type="file"
+          accept=".pdf,image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+              const base64 = (ev.target?.result as string).split(",")[1];
+              const endpoint = type === "ffl" ? "/api/admin/submissions/:id/ffl-file" : type === "sot" ? "/api/admin/submissions/:id/sot-file" : "/api/admin/submissions/:id/tax-form";
+              const body: Record<string, string> = {};
+              if (type === "ffl") { body.fflFileName = file.name; body.fflFileData = base64; }
+              else if (type === "sot") { body.sotFileName = file.name; body.sotFileData = base64; }
+              else { body.taxFormName = file.name; body.taxFormData = base64; }
+              try {
+                const res = await fetch(endpoint.replace(":id", submissionId), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                if (res.ok) { toast({ title: `${label} uploaded`, description: file.name }); window.location.reload(); }
+                else toast({ title: `Upload failed`, variant: "destructive" });
+              } catch { toast({ title: `Upload failed`, variant: "destructive" }); }
+            };
+            reader.readAsDataURL(file);
+          }}
+        />
+      </label>
+    );
+  }
+}
+
 function SotBadge({ dealer }: { dealer: Dealer }) {
   const now = new Date();
   // Prefer new sotExpiryDate (ISO), fall back to old sotPeriodEnd string
@@ -373,13 +437,6 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
           <>
             {sub.quantity && <p className="text-xs text-muted-foreground">Qty: <span className="text-foreground font-medium">{sub.quantity}</span></p>}
             {sub.description && <p className="text-xs text-foreground italic">"{sub.description}"</p>}
-            {sub.fflFileName && (
-              <div className="flex gap-2 items-center mt-1">
-                <p className="text-xs text-muted-foreground">{sub.fflFileName}</p>
-                {sub.fflFileData && <FilePreview fileName={sub.fflFileName} fileData={sub.fflFileData} />}
-                {sub.fflFileData && <FileDownload fileName={sub.fflFileName} fileData={sub.fflFileData} />}
-              </div>
-            )}
           </>
         ) : (
           <>
@@ -390,15 +447,11 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
       </div>
       {/* Documents — mobile */}
       <div className="border-t border-border pt-2 mt-2">
-        {(sub.fflFileName || sub.sotFileName || sub.taxFormName) ? (
-          <div className="flex flex-wrap gap-1.5">
-            {sub.fflFileName && <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">FFL</span>}
-            {sub.sotFileName && <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">SOT</span>}
-            {sub.taxFormName && <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">TAX</span>}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">No documents</p>
-        )}
+        <div className="flex flex-wrap gap-1.5">
+          <DocBadge type="ffl" fileName={sub.fflFileName} fileData={sub.fflFileData} submissionId={sub.id} />
+          <DocBadge type="sot" fileName={sub.sotFileName} fileData={sub.sotFileData} submissionId={sub.id} />
+          <DocBadge type="tax" fileName={sub.taxFormName} fileData={sub.taxFormData} submissionId={sub.id} />
+        </div>
       </div>
       {/* Shipping */}
       <div className="border-t border-border pt-2 mt-2">
@@ -445,26 +498,12 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: S
         <div className="text-muted-foreground text-xs"><CopyableText text={sub.email} /></div>
         {sub.phone && <div className="text-muted-foreground text-xs"><CopyableText text={sub.phone} /></div>}
         {sub.businessName && <div className="mt-1 text-xs px-1.5 py-0.5 bg-secondary rounded inline-block">{sub.businessName}</div>}
-        {sub.type === "dealer" && (
-          <div className="flex gap-1.5 mt-1 flex-wrap">
-            <span title="FFL on file" className="text-xs px-1 py-0.5 bg-blue-100 text-blue-700 rounded">FFL</span>
-            <span title="SOT on file" className="text-xs px-1 py-0.5 bg-purple-100 text-purple-700 rounded">SOT</span>
-            <span title="Tax ID on file" className="text-xs px-1 py-0.5 bg-green-100 text-green-700 rounded">Tax ID</span>
-          </div>
-        )}
       </td>
       <td className="px-3 py-3">
         {sub.type === "dealer" || sub.type === "dealer_order" ? (
           <div className="space-y-1">
             {sub.quantity && <div className="text-xs"><span className="text-muted-foreground">Qty:</span> <span className="font-medium text-foreground">{sub.quantity}</span></div>}
             {sub.description && <div className="text-xs max-w-[200px] text-foreground italic">"{sub.description}"</div>}
-            {sub.fflFileName && (
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">{sub.fflFileName}</span>
-                {sub.fflFileData && <FilePreview fileName={sub.fflFileName} fileData={sub.fflFileData} />}
-                {sub.fflFileData && <FileDownload fileName={sub.fflFileName} fileData={sub.fflFileData} />}
-              </div>
-            )}
           </div>
         ) : (
           <div className="space-y-1">
@@ -475,27 +514,9 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: S
       </td>
       <td className="px-3 py-3">
         <div className="flex flex-col gap-1">
-          {sub.fflFileName && sub.fflFileData && (
-            <div className="flex items-center gap-1" title={`FFL: ${sub.fflFileName}`}>
-              <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">FFL</span>
-              <FilePreview fileName={sub.fflFileName} fileData={sub.fflFileData} />
-            </div>
-          )}
-          {sub.sotFileName && sub.sotFileData && (
-            <div className="flex items-center gap-1" title={`SOT: ${sub.sotFileName}`}>
-              <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">SOT</span>
-              <FilePreview fileName={sub.sotFileName} fileData={sub.sotFileData} />
-            </div>
-          )}
-          {sub.taxFormName && sub.taxFormData && (
-            <div className="flex items-center gap-1" title={`Tax Form: ${sub.taxFormName}`}>
-              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">TAX</span>
-              <FilePreview fileName={sub.taxFormName} fileData={sub.taxFormData} />
-            </div>
-          )}
-          {!sub.fflFileName && !sub.sotFileName && !sub.taxFormName && (
-            <span className="text-xs text-muted-foreground italic">None</span>
-          )}
+          <DocBadge type="ffl" fileName={sub.fflFileName} fileData={sub.fflFileData} submissionId={sub.id} />
+          <DocBadge type="sot" fileName={sub.sotFileName} fileData={sub.sotFileData} submissionId={sub.id} />
+          <DocBadge type="tax" fileName={sub.taxFormName} fileData={sub.taxFormData} submissionId={sub.id} />
         </div>
       </td>
       <td className="px-3 py-3">

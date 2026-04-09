@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import fs from "fs";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
+import { createHash } from "crypto";
 import { globSync } from "glob";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,6 +12,7 @@ const __dirname = path.dirname(__filename);
 
 import { registerWildRoutes } from "./routes/wild.js";
 import session from "express-session";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { uploadDealerDocuments } from "./sftp-upload";
 import { pool } from "./db";
@@ -26,6 +28,17 @@ const GMAIL_TOKEN_PATH = "/home/dubdub/DubDub-Hub/gmail_token.json";
 const ENV_PATH = "/home/dubdub/DubDub-Hub/.env";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// File upload validation helper
+function validateFileUpload(fileName: string, fileData: string, maxSizeMB = 10): string | null {
+  if (!fileName || !fileData) return null;
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  const allowedExts = ["pdf", "png", "jpg", "jpeg"];
+  if (!ext || !allowedExts.includes(ext)) return "Invalid file type. Allowed: PDF, PNG, JPG, JPEG";
+  const sizeBytes = (fileData.length * 3) / 4;
+  if (sizeBytes > maxSizeMB * 1024 * 1024) return "File too large. Maximum " + maxSizeMB + "MB";
+  return null;
+}
+
 // Geocoding helper
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -120,7 +133,7 @@ async function parseSotFile(fileData: string, fileName: string): Promise<{ text:
   if (ext === "pdf") {
     try {
       execSync(`pdftoppm -r 150 -png "${tmpPath}" /tmp/sot_parse_page`, { stdio: "ignore" });
-      const pageImg = glob.sync("/tmp/sot_parse_page-*.png")[0];
+      const pageImg = globSync("/tmp/sot_parse_page-*.png")[0];
       if (pageImg) {
         execSync(`tesseract "${pageImg}" stdout -l eng --psm 6 2>/dev/null > /tmp/sot_ocr.txt`);
         text = fs.readFileSync("/tmp/sot_ocr.txt", "utf8");
@@ -134,7 +147,7 @@ async function parseSotFile(fileData: string, fileName: string): Promise<{ text:
   }
   try { fs.unlinkSync(tmpPath); } catch {}
   try { fs.unlinkSync("/tmp/sot_ocr.txt"); } catch {}
-  try { glob.sync("/tmp/sot_parse_page-*.png").forEach((f: string) => fs.unlinkSync(f)); } catch {}
+  try { globSync("/tmp/sot_parse_page-*.png").forEach((f: string) => fs.unlinkSync(f)); } catch {}
   return { text, parsed: parseSotText(text) };
 }
 
@@ -147,7 +160,7 @@ async function parseFflFile(fileData: string, fileName: string): Promise<{ text:
   if (ext === "pdf") {
     try {
       execSync(`pdftoppm -r 150 -png "${tmpPath}" /tmp/ffl_parse_page`, { stdio: "ignore" });
-      const pageImg = glob.sync("/tmp/ffl_parse_page-*.png")[0];
+      const pageImg = globSync("/tmp/ffl_parse_page-*.png")[0];
       if (pageImg) {
         execSync(`tesseract "${pageImg}" stdout -l eng --psm 6 2>/dev/null > /tmp/ffl_ocr.txt`);
         text = fs.readFileSync("/tmp/ffl_ocr.txt", "utf8");
@@ -161,7 +174,7 @@ async function parseFflFile(fileData: string, fileName: string): Promise<{ text:
   }
   try { fs.unlinkSync(tmpPath); } catch {}
   try { fs.unlinkSync("/tmp/ffl_ocr.txt"); } catch {}
-  try { glob.sync("/tmp/ffl_parse_page-*.png").forEach((f: string) => fs.unlinkSync(f)); } catch {}
+  try { globSync("/tmp/ffl_parse_page-*.png").forEach((f: string) => fs.unlinkSync(f)); } catch {}
   return { text, parsed: parseFflText(text) };
 }
 
@@ -258,7 +271,7 @@ function buildMime({
   return Buffer.from(raw).toString("base64url");
 }
 
-async function sendViaGmail({
+export async function sendViaGmail({
   to,
   cc,
   bcc,
@@ -356,12 +369,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.set('trust proxy', 1);
 
   // Setup simple session for admin
+  if (!process.env.SESSION_SECRET) {
+    console.error('FATAL: SESSION_SECRET environment variable is required');
+    process.exit(1);
+  }
+
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'super-secret-dubdub-key',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === "production" }
+    cookie: { secure: process.env.NODE_ENV === "production", httpOnly: true, sameSite: "strict", maxAge: 7 * 24 * 60 * 60 * 1000 }
   }));
+
+  const publicFormLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { ok: false, error: "Too many requests" } });
 
   // Get client IP from request
   const getClientIp = (req: any): string => {
@@ -389,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate 6-digit PIN
       const pin = Math.floor(100000 + Math.random() * 900000).toString();
-      const pinHash = Buffer.from(pin).toString('base64'); // simple hash, not cryptographic but enough for this use
+      const pinHash = createHash('sha256').update(pin).digest('hex');
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
 
       await pool.query(
@@ -425,7 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const ip = getClientIp(req);
-      const pinHash = Buffer.from(pin).toString('base64');
+      const pinHash = createHash('sha256').update(pin).digest('hex');
 
       // Check for recent failed attempts (brute force protection)
       const recentFail = await pool.query(
@@ -585,6 +605,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload / update FFL file for a submission
+  app.post("/api/admin/submissions/:id/ffl-file", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fflFileName, fflFileData } = req.body || {};
+      if (!fflFileData) return res.status(400).json({ ok: false, error: "no_file" });
+      await pool.query(
+        `UPDATE submissions SET ffl_file_name = $1, ffl_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [fflFileName || "ffl-file", fflFileData, id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("upload_submission_ffl_error", err);
+      return res.status(500).json({ ok: false, error: "upload_failed" });
+    }
+  });
+
+  // Upload / update SOT file for a submission
+  app.post("/api/admin/submissions/:id/sot-file", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { sotFileName, sotFileData } = req.body || {};
+      if (!sotFileData) return res.status(400).json({ ok: false, error: "no_file" });
+      await pool.query(
+        `UPDATE submissions SET sot_file_name = $1, sot_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [sotFileName || "sot-file", sotFileData, id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("upload_submission_sot_error", err);
+      return res.status(500).json({ ok: false, error: "upload_failed" });
+    }
+  });
+
+  // Upload / update Tax Form file for a submission
+  app.post("/api/admin/submissions/:id/tax-form", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { taxFormName, taxFormData } = req.body || {};
+      if (!taxFormData) return res.status(400).json({ ok: false, error: "no_file" });
+      await pool.query(
+        `UPDATE submissions SET tax_form_name = $1, tax_form_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        [taxFormName || "tax-form", taxFormData, id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("upload_submission_tax_error", err);
+      return res.status(500).json({ ok: false, error: "upload_failed" });
+    }
+  });
+
   // ── Dealers API ───────────────────────────────────────────────────────────
 
   // Public: Dealer map data (no PII — name, city, state, zip, tier, verified, phone)
@@ -593,7 +664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dealers/map", async (req, res) => {
     try {
       const result = await pool.query(`
-        SELECT id, business_name, city, state, zip, tier, verified, phone, email, ffl_license_number
+        SELECT id, business_name, city, state, zip, tier, verified, phone, ffl_license_number
         FROM dealers
         ORDER BY
           CASE WHEN tier = 'Preferred' THEN 0 ELSE 1 END,
@@ -702,7 +773,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/dealers/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const [dealer] = await pool.query(`SELECT * FROM dealers WHERE id = $1`, [id]);
+      const dealerResult = await pool.query(`SELECT * FROM dealers WHERE id = $1`, [id]);
+      const dealer = dealerResult.rows[0];
       if (!dealer) return res.status(404).json({ ok: false, error: "dealer_not_found" });
 
       const subs = await pool.query(`
@@ -938,9 +1010,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(start) || isNaN(end) || start > end || end - start > 1000) {
         return res.status(400).json({ ok: false, error: "Invalid serial range (max 1000 labels at once)" });
       }
-      const { execSync } = await import("child_process");
+      // execFileSync already imported at top
       const script = "/home/dubdub/DubDub-Hub/bot/services/label_generator.py";
-      const output = execSync(`python3 ${script} ${start} ${end}`, { encoding: "utf-8" }).trim();
+      const output = execFileSync("python3", [script, String(start), String(end)], { encoding: "utf-8" }).trim();
       const match = output.match(/Generated label strip: (.+)/);
       const pdfPath = match ? match[1] : null;
       if (!pdfPath) {
@@ -1165,7 +1237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check against verified dealers table first
       const dealer = await pool.query(
-        `SELECT id, business_name, verified, ffl_license_number, ffl_expiry, contact_name, email, phone, ein
+        `SELECT id, business_name, verified
          FROM dealers WHERE UPPER(REPLACE(REPLACE(ffl_license_number, '-', ''), ' ', '')) = $1`,
         [normalized]
       );
@@ -1175,13 +1247,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ok: true,
           valid: true,
           dealerName: dealer.rows[0].business_name,
-          fromDealersTable: true,
-          fflLicenseNumber: dealer.rows[0].ffl_license_number,
-          fflExpiry: dealer.rows[0].ffl_expiry,
-          contactName: dealer.rows[0].contact_name,
-          email: dealer.rows[0].email,
-          phone: dealer.rows[0].phone,
-          ein: dealer.rows[0].ein,
         });
       }
 
@@ -1210,7 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── FFL Upload (pending dealer — text only, no file) ─────────────────────────
-  app.post("/api/ffl/upload", async (req, res) => {
+  app.post("/api/ffl/upload", publicFormLimiter, async (req, res) => {
     try {
       const {
         fflNumber, dealerName, contactName, email, phone, address, city, state, zipCode, message,
@@ -1219,6 +1284,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taxFormName, taxFormData,
       } = req.body;
       if (!fflNumber) return res.status(400).json({ ok: false, error: "missing_ffl" });
+
+      // Validate uploaded files
+      if (fflFileName && fflFileData) {
+        const fflErr = validateFileUpload(fflFileName, fflFileData);
+        if (fflErr) return res.status(400).json({ ok: false, error: fflErr });
+      }
+      if (sotFileName && sotFileData) {
+        const sotErr = validateFileUpload(sotFileName, sotFileData);
+        if (sotErr) return res.status(400).json({ ok: false, error: sotErr });
+      }
+      if (taxFormName && taxFormData) {
+        const taxErr = validateFileUpload(taxFormName, taxFormData);
+        if (taxErr) return res.status(400).json({ ok: false, error: taxErr });
+      }
 
       // Parse combined FFL+SOT PDFs — run both parsers on every uploaded file
       // so a single combined form gets split into correct DB columns
@@ -1376,7 +1455,7 @@ DubDub22 Minions`;
     }
   });
 
-  app.post("/api/dealer-request", async (req, res) => {
+  app.post("/api/dealer-request", publicFormLimiter, async (req, res) => {
     try {
       const { requestType, dealerName, contactName, businessName, email, phone, quantityCans, fflFileName, fflFileData, sotFileName, sotFileData, message, orderKind, fflNumber, ein, resaleFileName, resaleFileData, taxFormFileName, taxFormFileData, termsAccepted } = req.body || {};
 
@@ -1389,6 +1468,24 @@ DubDub22 Minions`;
       }
       if (!isInquiry && !quantityCans) {
         return res.status(400).json({ ok: false, error: "missing_required_fields" });
+      }
+
+      // Validate uploaded files
+      if (fflFileName && fflFileData) {
+        const fflErr = validateFileUpload(fflFileName, fflFileData);
+        if (fflErr) return res.status(400).json({ ok: false, error: fflErr });
+      }
+      if (sotFileName && sotFileData) {
+        const sotErr = validateFileUpload(sotFileName, sotFileData);
+        if (sotErr) return res.status(400).json({ ok: false, error: sotErr });
+      }
+      if (resaleFileName && resaleFileData) {
+        const resaleErr = validateFileUpload(resaleFileName, resaleFileData);
+        if (resaleErr) return res.status(400).json({ ok: false, error: resaleErr });
+      }
+      if (taxFormFileName && taxFormFileData) {
+        const taxErr = validateFileUpload(taxFormFileName, taxFormFileData);
+        if (taxErr) return res.status(400).json({ ok: false, error: taxErr });
       }
 
       const isDemoOrder = orderKind === "demo" || (!isInquiry && quantityCans === '1');
@@ -1628,7 +1725,7 @@ DubDub22 Minions`;
     }
   });
 
-  app.post("/api/warranty-request", async (req, res) => {
+  app.post("/api/warranty-request", publicFormLimiter, async (req, res) => {
     try {
       const { name, email, serialNumber, description, serialPhotoName, serialPhotoData, damagePhoto1Name, damagePhoto1Data, damagePhoto2Name, damagePhoto2Data } = req.body || {};
       if (!name || !email || !serialNumber || !description) {
@@ -1639,6 +1736,20 @@ DubDub22 Minions`;
       }
       if (!/[A-Za-z]{3,}/.test(String(description))) {
         return res.status(400).json({ ok: false, error: "description_must_have_word_3_letters" });
+      }
+
+      // Validate uploaded photos
+      if (serialPhotoName && serialPhotoData) {
+        const err = validateFileUpload(serialPhotoName, serialPhotoData);
+        if (err) return res.status(400).json({ ok: false, error: err });
+      }
+      if (damagePhoto1Name && damagePhoto1Data) {
+        const err = validateFileUpload(damagePhoto1Name, damagePhoto1Data);
+        if (err) return res.status(400).json({ ok: false, error: err });
+      }
+      if (damagePhoto2Name && damagePhoto2Data) {
+        const err = validateFileUpload(damagePhoto2Name, damagePhoto2Data);
+        if (err) return res.status(400).json({ ok: false, error: err });
       }
 
       const body = [
@@ -1712,7 +1823,7 @@ DubDub22 Minions`;
   });
 
   // ── Public: Dealer Order / Inquiry ──────────────────────────────────────────
-  app.post("/api/retail-order", async (req, res) => {
+  app.post("/api/retail-order", publicFormLimiter, async (req, res) => {
     try {
       const {
         intent, contactName, businessName, email, phone,
@@ -1883,7 +1994,7 @@ DubDub22 Minions`;
   });
 
   // ── Public: Submit dealer inquiry ────────────────────────────────────────────
-  app.post("/api/retail-inquiry", async (req, res) => {
+  app.post("/api/retail-inquiry", publicFormLimiter, async (req, res) => {
     try {
       const { dealerId, contactName, email, phone, message } = req.body || {};
       if (!dealerId || !contactName) {
@@ -2325,6 +2436,9 @@ DubDub22 Minions`;
         // Allow re-upload — just overwrite
       }
 
+      const taxFormErr = validateFileUpload(taxFormFileName, taxFormFileData);
+      if (taxFormErr) return res.status(400).json({ ok: false, error: taxFormErr });
+
       const ext = taxFormFileName.split(".").pop()?.toLowerCase() || "pdf";
       await pool.query(
         `UPDATE dealer_tax_forms
@@ -2559,14 +2673,14 @@ DubDub22 Minions`;
       let isWarranty = false;
       let subDealerId: string | null = null;
       if (submissionId) {
-        const [subRow] = await pool.query(
+        const subRowResult = await pool.query(
           `SELECT s.*, ds.dealer_id FROM submissions s
            LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
            WHERE s.id = $1 LIMIT 1`,
           [submissionId]
         );
-        if (subRow && subRow.rows.length > 0) {
-          const sub = subRow.rows[0];
+        if (subRowResult.rows.length > 0) {
+          const sub = subRowResult.rows[0];
           isWarranty = sub.type === 'warranty';
           subDealerId = sub.dealer_id || null;
           // Pre-fill any missing fields from submission
@@ -2691,7 +2805,7 @@ print(pdf_path)
     }
   });
 
-  app.post("/api/contact", async (req, res) => {
+  app.post("/api/contact", publicFormLimiter, async (req, res) => {
     try {
       const { name, email, subject, message } = req.body || {};
       if (!name || !email || !subject || !message) {
