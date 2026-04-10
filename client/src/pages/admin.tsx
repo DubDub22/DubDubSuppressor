@@ -210,9 +210,10 @@ function FileDownload({ fileName, fileData }: { fileName?: string; fileData?: st
 }
 
 // Always-visible FFL/SOT/TAX/STATE TAX badges — green = has file, red = missing. Badge is clickable to view or upload.
-// hasFile is true if: base64 data exists (dealer fallback), OR SFTP path exists (submission-level migrated files)
+// hasFile: green only when a file_name is present (indicating an upload happened).
+// SFTP path (fflLicenseNumber + createdAt) only enables the download URL, not the green badge.
 function DocBadge({ type, fileName, fileData, orDealerFileData, submissionId, fflLicenseNumber, createdAt }: { type: "ffl" | "sot" | "tax" | "state_tax"; fileName?: string; fileData?: string; orDealerFileData?: string; submissionId: string; fflLicenseNumber?: string; createdAt?: string }) {
-  const hasFile = !!(fileName && fileData) || !!(orDealerFileData) || !!(fflLicenseNumber && createdAt);
+  const hasFile = !!(fileName && fileData) || !!(orDealerFileData);
   const label = type === "state_tax" ? "STATE TAX" : type.toUpperCase();
   const colors: Record<string, string> = {
     ffl: hasFile ? "bg-green-600 text-white hover:bg-green-700" : "bg-red-500 text-white hover:bg-red-600",
