@@ -213,7 +213,9 @@ function FileDownload({ fileName, fileData }: { fileName?: string; fileData?: st
 // hasFile: green only when a file_name is present (indicating an upload happened).
 // SFTP path (fflLicenseNumber + createdAt) only enables the download URL, not the green badge.
 function DocBadge({ type, fileName, fileData, orDealerFileData, submissionId, fflLicenseNumber, createdAt }: { type: "ffl" | "sot" | "tax" | "state_tax"; fileName?: string; fileData?: string; orDealerFileData?: string; submissionId: string; fflLicenseNumber?: string; createdAt?: string }) {
-  const hasFile = !!(fileName && fileData) || !!(orDealerFileData);
+  // hasFile: true when fileName is present (upload happened), OR when base64 data exists (dealer-level file).
+  // fileData is now always null for submissions (files moved to SFTP) — fileName is the signal.
+  const hasFile = !!(fileName) || !!(orDealerFileData);
   const label = type === "state_tax" ? "STATE TAX" : type.toUpperCase();
   const colors: Record<string, string> = {
     ffl: hasFile ? "bg-green-600 text-white hover:bg-green-700" : "bg-red-500 text-white hover:bg-red-600",
