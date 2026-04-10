@@ -229,9 +229,10 @@ function DocBadge({ type, fileName, fileData, orDealerFileData, submissionId, ff
     const previewName = fileName || (type === "ffl" ? "FFL.pdf" : type === "sot" ? "SOT.pdf" : type === "state_tax" ? "state-tax.pdf" : "tax-form.pdf");
     const isPdf = previewName.toLowerCase().endsWith(".pdf");
     // Submission-level files: use SFTP API endpoint
-    const apiUrl = fflLicenseNumber && createdAt
-      ? `/api/admin/submissions/${submissionId}/file/${type}?ffl=${encodeURIComponent(fflLicenseNumber)}&created=${encodeURIComponent(createdAt)}`
-      : null;
+    // If fflLicenseNumber is available, include it in the query; otherwise use submissionId alone
+    const apiUrl = fflLicenseNumber
+      ? `/api/admin/submissions/${submissionId}/file/${type}?ffl=${encodeURIComponent(fflLicenseNumber)}&created=${encodeURIComponent(createdAt || "")}`
+      : `/api/admin/submissions/${submissionId}/file/${type}`;
     return (
       <Popover>
         <PopoverTrigger asChild>

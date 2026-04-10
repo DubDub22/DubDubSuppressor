@@ -592,7 +592,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const suffix = suffixMap[type];
       if (!suffix) return res.status(400).json({ ok: false, error: "invalid_type" });
 
-      const folder = fflToFolderName(ffl);
+      // Use sub-{id} folder if ffl is empty/NOFFL, otherwise use FFL-based folder
+      const rawFolder = fflToFolderName(ffl);
+      const folder = (rawFolder === "NOFFL" || !ffl) ? `sub-${id}` : rawFolder;
       const dateStr = (created as string).split("T")[0].replace(/-/g, "");
       // Try both .pdf and .png extensions
       const remotePath = `/home/dealer-uploader/dealer-docs/${folder}/${suffix}_${dateStr}.pdf`;
