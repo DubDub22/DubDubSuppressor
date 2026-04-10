@@ -61,6 +61,8 @@ export class DatabaseStorage implements IStorage {
       SELECT s.*,
         CASE WHEN i.id IS NOT NULL THEN true ELSE false END AS has_invoice,
         i.invoice_number,
+        ds.order_type,
+        ds.quantity AS dealer_order_quantity,
         d.ffl_file_name AS dealer_ffl_file_name,
         d.ffl_file_data AS dealer_ffl_file_data,
         d.sot_file_name AS dealer_sot_file_name,
@@ -72,6 +74,7 @@ export class DatabaseStorage implements IStorage {
       FROM submissions s
       LEFT JOIN invoices i ON i.submission_id = s.id AND i.status = 'sent'
       LEFT JOIN dealers d ON d.ffl_license_number = s.ffl_license_number AND d.ffl_license_number IS NOT NULL AND d.ffl_license_number != ''
+      LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
       WHERE ${includeArchived ? sql`1=1` : sql`s.archived = false`}
       ORDER BY s.created_at DESC
     `);

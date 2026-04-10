@@ -69,6 +69,7 @@ type Submission = {
   hasOrderedDemo?: string;
   createdAt: string;
   order_type?: string;
+  dealer_order_quantity?: string;
   archived?: boolean;
   archived_from?: string;
 };
@@ -338,9 +339,11 @@ function SubmissionsTab({
   setInvoiceTarget: (s: Submission | null) => void;
   onFetchSubmissions: () => void;
 }) {
-  // Exclude warranty submissions — they go to the Warranty tab
+  // Exclude warranty submissions, and dealer inquiries (type=dealer + order_type=inquiry) — they go to Dealer Inquiries tab
   const filtered = submissions.filter((sub) => {
     if (sub.type === "warranty") return false;
+    // Exclude dealer leads that haven't been converted to orders yet
+    if (sub.type === "dealer" && sub.order_type === "inquiry") return false;
     if (search) {
       const q = search.toLowerCase();
       const s = `${fmtDate(sub.createdAt)} ${sub.contactName} ${sub.businessName} ${sub.email} ${sub.phone} ${sub.serialNumber} ${sub.description || ""}`.toLowerCase();
@@ -460,6 +463,12 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
             {sub.quantity && <p className="text-xs text-muted-foreground">Qty: <span className="text-foreground font-medium">{sub.quantity}</span></p>}
             {sub.description && <p className="text-xs text-foreground italic">"{sub.description}"</p>}
           </>
+        ) : sub.type === "demo" ? (
+          <>
+            {sub.quantity && <p className="text-xs text-muted-foreground">Qty: <span className="text-foreground font-medium">{sub.quantity}</span></p>}
+            {!sub.quantity && <p className="text-xs text-muted-foreground">Qty: <span className="text-foreground font-medium">1</span></p>}
+            {sub.description && <p className="text-xs text-foreground">{sub.description}</p>}
+          </>
         ) : (
           <>
             <p className="text-xs text-muted-foreground">Serial: <span className="font-mono text-foreground">{sub.serialNumber}</span></p>
@@ -527,6 +536,12 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestD
           <div className="space-y-1">
             {sub.quantity && <div className="text-xs"><span className="text-muted-foreground">Qty:</span> <span className="font-medium text-foreground">{sub.quantity}</span></div>}
             {sub.description && <div className="text-xs max-w-[200px] text-foreground italic">"{sub.description}"</div>}
+          </div>
+        ) : sub.type === "demo" ? (
+          <div className="space-y-1">
+            {sub.quantity && <div className="text-xs"><span className="text-muted-foreground">Qty:</span> <span className="font-medium text-foreground">{sub.quantity}</span></div>}
+            {!sub.quantity && <div className="text-xs"><span className="text-muted-foreground">Qty:</span> <span className="font-medium text-foreground">1</span></div>}
+            {sub.description && <div className="text-xs text-foreground max-w-[250px]">{sub.description}</div>}
           </div>
         ) : (
           <div className="space-y-1">
