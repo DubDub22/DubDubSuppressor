@@ -563,20 +563,6 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestD
           </div>
         ) : (
           <div className="space-y-1">
-            <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-primary text-primary hover:bg-primary/10" onClick={onShip}>
-              Mark Shipped
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`h-7 text-xs whitespace-nowrap ${(sub as any).hasInvoice
-                ? "border-green-600 text-green-600 hover:bg-green-50"
-                : "border-red-600 text-red-600 hover:bg-red-50"
-              }`}
-              onClick={onInvoice}
-            >
-              {(sub as any).hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -596,6 +582,20 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestD
               title={(sub as any).form3SubmittedAt ? "Form 3 already submitted" : "Send Form 3 Submitted email"}
             >
               {(sub as any).form3SubmittedAt ? "✓ Form 3 Sent" : "Form 3 Submitted"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-7 text-xs whitespace-nowrap ${(sub as any).hasInvoice
+                ? "border-green-600 text-green-600 hover:bg-green-50"
+                : "border-red-600 text-red-600 hover:bg-red-50"
+              }`}
+              onClick={onInvoice}
+            >
+              {(sub as any).hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-primary text-primary hover:bg-primary/10" onClick={onShip}>
+              Mark Shipped
             </Button>
           </div>
         )}
