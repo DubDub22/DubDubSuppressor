@@ -225,39 +225,9 @@ function DocBadge({ type, fileName, fileData, orDealerFileData, submissionId, ff
   };
 
   if (hasFile) {
-    // Show preview — SFTP URL if path exists, otherwise base64 fallback
-    const previewName = fileName || (type === "ffl" ? "FFL.pdf" : type === "sot" ? "SOT.pdf" : type === "state_tax" ? "state-tax.pdf" : "tax-form.pdf");
-    const isPdf = previewName.toLowerCase().endsWith(".pdf");
-    // Submission-level files: use SFTP API endpoint
-    // If fflLicenseNumber is available, include it in the query; otherwise use submissionId alone
-    const apiUrl = fflLicenseNumber
-      ? `/api/admin/submissions/${submissionId}/file/${type}?ffl=${encodeURIComponent(fflLicenseNumber)}&created=${encodeURIComponent(createdAt || "")}`
-      : `/api/admin/submissions/${submissionId}/file/${type}`;
+    // Green badge — file confirmed archived on SFTP. Non-clickable.
     return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <button className={`text-xs px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${colors[type]}`}>{label}</button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[480px] max-h-[520px] p-0 border-border bg-card overflow-auto">
-          {isPdf ? (
-            apiUrl ? (
-              <iframe src={apiUrl} className="w-full rounded" style={{ height: "500px" }} title={previewName} />
-            ) : (
-              <div className="w-full rounded flex items-center justify-center bg-muted" style={{ height: "500px" }}>
-                <p className="text-muted-foreground text-sm">Preview unavailable — file stored on secure server</p>
-              </div>
-            )
-          ) : (
-            apiUrl ? (
-              <img src={apiUrl} alt={previewName} className="w-full h-auto rounded" />
-            ) : (
-              <div className="w-full rounded flex items-center justify-center bg-muted" style={{ height: "200px" }}>
-                <p className="text-muted-foreground text-sm">Preview unavailable — file stored on secure server</p>
-              </div>
-            )
-          )}
-        </PopoverContent>
-      </Popover>
+      <span className={`text-xs px-2 py-0.5 rounded font-bold ${colors[type]}`}>{label}</span>
     );
   } else {
     // Missing — click to upload
