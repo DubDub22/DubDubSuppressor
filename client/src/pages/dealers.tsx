@@ -34,7 +34,11 @@ export default function DealersPage() {
         setTimeout(() => {
           const email = data.email || "";
           const phone = data.phone || "";
-          window.location.href = `/apply?ffl=${encodeURIComponent(fullFfl)}&name=${encodeURIComponent(data.dealerName || "")}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`;
+          const address = data.address || "";
+          const city = data.city || "";
+          const state = data.state || "";
+          const zip = data.zip || "";
+          window.location.href = `/apply?ffl=${encodeURIComponent(fullFfl)}&name=${encodeURIComponent(data.dealerName || "")}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}&address=${encodeURIComponent(address)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&zip=${encodeURIComponent(zip)}`;
         }, 1500);
       } else {
         setStatus("not-found");

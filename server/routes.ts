@@ -58,7 +58,7 @@ async function geocodeZip(zip: string): Promise<{ lat: number; lng: number; stat
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OCR / Parse helpers — shared by file-upload routes and parse-* routes
+// OCR / Parse helpers - shared by file-upload routes and parse-* routes
 // ─────────────────────────────────────────────────────────────────────────────
 
 function parseSotText(text: string): Record<string, string> {
@@ -333,7 +333,7 @@ let multiStateTaxFormBase64: string | null = null;
 try {
   multiStateTaxFormBase64 = fs.readFileSync(MULTI_STATE_TAX_FORM_PATH, "base64");
 } catch {
-  console.warn("multi_state_tax_form.pdf not found — tax form attachment will be skipped");
+  console.warn("multi_state_tax_form.pdf not found - tax form attachment will be skipped");
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -468,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ ok: false, error: "invalid_or_expired_pin" });
       }
 
-      // PIN is valid — delete it and whitelist the IP for 7 days
+      // PIN is valid - delete it and whitelist the IP for 7 days
       await pool.query(`DELETE FROM admin_pin_requests WHERE id = $1`, [result.rows[0].id]);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await pool.query(
@@ -537,11 +537,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasInvoice: s.has_invoice,
         invoiceNumber: s.invoice_number,
         fflFileName: s.ffl_file_name,
-        // fflFileData no longer returned — served via /api/admin/submissions/:id/file/:type
+        // fflFileData no longer returned - served via /api/admin/submissions/:id/file/:type
         sotFileName: s.sot_file_name,
         taxFormName: s.tax_form_name,
         stateTaxFileName: s.state_tax_file_name,
-        // Dealer doc fields — badges show green if dealer has file (file_data not needed for badges, just the name for display)
+        // Dealer doc fields - badges show green if dealer has file (file_data not needed for badges, just the name for display)
         dealerFflFileName: s.dealer_ffl_file_name,
         dealerSotFileName: s.dealer_sot_file_name,
         dealerTaxFormName: s.dealer_tax_form_name,
@@ -551,6 +551,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: s.created_at,
         order_type: s.order_type,
         form3SubmittedAt: s.form3_submitted_at,
+        customerAddress: s.customer_address,
+        customerCity: s.customer_city,
+        customerState: s.customer_state,
+        customerZip: s.customer_zip,
       }));
       return res.json({ ok: true, data: mapped });
     } catch (err: any) {
@@ -560,7 +564,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stream a document for a submission from 3dprintmanager SFTP
-  // GET /api/admin/submissions/:id/file/:type?ffl=&created=
+  
+  // GET /api/admin/submissions/:id — fetch single submission with all fields including customer address
+  app.get("/api/admin/submissions/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await pool.query(`SELECT s.*, ds.dealer_id FROM submissions s LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id WHERE s.id = $1 LIMIT 1`, [id]);
+      if (!result.rows.length) return res.status(404).json({ ok: false, error: "not_found" });
+      const s = result.rows[0];
+      const mapped = {
+        id: s.id,
+        type: s.type,
+        contactName: s.contact_name,
+        businessName: s.business_name,
+        email: s.email,
+        phone: s.phone,
+        quantity: s.quantity,
+        description: s.description,
+        serialNumber: s.serial_number,
+        trackingNumber: s.tracking_number,
+        shippedAt: s.shipped_at,
+        archived: s.archived,
+        archived_from: s.archived_from,
+        hasInvoice: s.has_invoice,
+        invoiceNumber: s.invoice_number,
+        fflFileName: s.ffl_file_name,
+        sotFileName: s.sot_file_name,
+        taxFormName: s.tax_form_name,
+        stateTaxFileName: s.state_tax_file_name,
+        dealerFflFileName: s.dealer_ffl_file_name,
+        dealerSotFileName: s.dealer_sot_file_name,
+        dealerTaxFormName: s.dealer_tax_form_name,
+        dealerStateTaxFileName: s.dealer_state_tax_file_name,
+        fflLicenseNumber: s.ffl_license_number,
+        createdAt: s.created_at,
+        order_type: s.order_type,
+        form3SubmittedAt: s.form3_submitted_at,
+        customerAddress: s.customer_address,
+        customerCity: s.customer_city,
+        customerState: s.customer_state,
+        customerZip: s.customer_zip,
+      };
+      return res.json({ ok: true, data: mapped });
+    } catch (err: any) {
+      console.error("fetch_submission_error", err);
+      return res.status(500).json({ ok: false, error: "failed_to_fetch" });
+    }
+  });
+
+// GET /api/admin/submissions/:id/file/:type?ffl=&created=
   // type = ffl | sot | tax | state_tax
   app.get("/api/admin/submissions/:id/file/:type", requireAdmin, async (req, res) => {
     try {
@@ -671,7 +723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!trackingNumber?.trim()) {
         return res.status(400).json({ ok: false, error: "tracking_number_required" });
       }
-      // Look up the submission first — if it's a demo (type=dealer, qty=1), lock the demo flag
+      // Look up the submission first - if it's a demo (type=dealer, qty=1), lock the demo flag
       const sub = await pool.query(`SELECT ds.dealer_id, s.type, s.quantity FROM submissions s JOIN dealer_submissions ds ON ds.submission_id = s.id WHERE s.id = $1 LIMIT 1`, [id]);
       const dealerId = sub.rows[0]?.dealer_id;
       await pool.query(
@@ -790,7 +842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── Dealers API ───────────────────────────────────────────────────────────
 
-  // Public: Dealer map data (no PII — name, city, state, zip, tier, verified, phone)
+  // Public: Dealer map data (no PII - name, city, state, zip, tier, verified, phone)
   // Preferred dealers: show curated phone if submitted, else FFL voicePhone
   // Standard dealers: show FFL voicePhone
   app.get("/api/dealers/map", async (req, res) => {
@@ -816,7 +868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public: Dealers near a zip code (lazy-load — only fetched on zip search)
+  // Public: Dealers near a zip code (lazy-load - only fetched on zip search)
   // GET /api/dealers/nearby?zip=XXXXX
   // Returns nearest 20 FFLs total, plus the nearest Preferred dealer separately
   app.get("/api/dealers/nearby", async (req, res) => {
@@ -863,7 +915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Nearest 20 FFLs (all tiers)
       const nearest20 = withDist.slice(0, 20);
 
-      // Nearest Preferred dealer — same state (all results already in-state from query)
+      // Nearest Preferred dealer - same state (all results already in-state from query)
       const nearestPreferred = withDist.find(d => d.tier === "Preferred") || null;
 
       return res.json({
@@ -1189,7 +1241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Parse SOT file — extract text from PDF/image and return structured data
+  // Parse SOT file - extract text from PDF/image and return structured data
   app.post("/api/admin/dealers/parse-sot", requireAdmin, async (req, res) => {
     try {
       const { sotFileData, sotFileName } = req.body || {};
@@ -1202,7 +1254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Parse FFL file — extract text from PDF/image and return structured data
+  // Parse FFL file - extract text from PDF/image and return structured data
   app.post("/api/admin/dealers/parse-ffl", requireAdmin, async (req, res) => {
     try {
       const { fflFileData, fflFileName } = req.body || {};
@@ -1215,7 +1267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Upload / update SOT file for a dealer — parse and auto-populate SOT fields
+  // Upload / update SOT file for a dealer - parse and auto-populate SOT fields
   app.post("/api/admin/dealers/:id/sot-file", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
@@ -1261,7 +1313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Upload / update FFL file for a dealer — parse and auto-populate FFL fields
+  // Upload / update FFL file for a dealer - parse and auto-populate FFL fields
   app.post("/api/admin/dealers/:id/ffl-file", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
@@ -1369,7 +1421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check against verified dealers table first
       const dealer = await pool.query(
-        `SELECT id, business_name, verified
+        `SELECT id, business_name, verified, business_address, city, state, zip
          FROM dealers WHERE UPPER(REPLACE(REPLACE(ffl_license_number, '-', ''), ' ', '')) = $1`,
         [normalized]
       );
@@ -1379,6 +1431,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ok: true,
           valid: true,
           dealerName: dealer.rows[0].business_name,
+          address: dealer.rows[0].business_address || "",
+          city: dealer.rows[0].city || "",
+          state: dealer.rows[0].state || "",
+          zip: dealer.rows[0].zip || "",
         });
       }
 
@@ -1398,7 +1454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Not found — route to pending upload
+      // Not found - route to pending upload
       return res.json({ ok: true, valid: false });
     } catch (err: any) {
       console.error("ffl_validate_error", err);
@@ -1406,7 +1462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ── FFL Upload (pending dealer — text only, no file) ─────────────────────────
+  // ── FFL Upload (pending dealer - text only, no file) ─────────────────────────
   app.post("/api/ffl/upload", publicFormLimiter, async (req, res) => {
     try {
       const {
@@ -1431,7 +1487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (taxErr) return res.status(400).json({ ok: false, error: taxErr });
       }
 
-      // Parse combined FFL+SOT PDFs — run both parsers on every uploaded file
+      // Parse combined FFL+SOT PDFs - run both parsers on every uploaded file
       // so a single combined form gets split into correct DB columns
       let parsedFfl: Record<string, string> = {};
       let parsedSot: Record<string, string> = {};
@@ -1439,7 +1495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (fflFileData) {
           const fflResult = await parseFflFile(fflFileData, fflFileName || "ffl-file");
           parsedFfl = fflResult.parsed || {};
-          // FFL file might also contain SOT data (combined form) — try parsing it as SOT too
+          // FFL file might also contain SOT data (combined form) - try parsing it as SOT too
           const sotResult = await parseSotFile(fflFileData, fflFileName || "sot-file");
           if (Object.keys(sotResult.parsed || {}).length > Object.keys(parsedSot).length) {
             parsedSot = sotResult.parsed || {};
@@ -1448,7 +1504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (sotFileData && sotFileData !== fflFileData) {
           const sotResult = await parseSotFile(sotFileData, sotFileName || "sot-file");
           parsedSot = { ...parsedSot, ...(sotResult.parsed || {}) };
-          // SOT file might also contain FFL data — try parsing it as FFL too
+          // SOT file might also contain FFL data - try parsing it as FFL too
           const fflResult = await parseFflFile(sotFileData, sotFileName || "ffl-file");
           if (Object.keys(fflResult.parsed || {}).length > Object.keys(parsedFfl).length) {
             parsedFfl = fflResult.parsed || {};
@@ -1456,7 +1512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (e) {
         console.error("ffl_upload_parse_warning", e);
-        // Non-fatal — continue without parsed data
+        // Non-fatal - continue without parsed data
       }
 
       const normalized = fflNumber.replace(/[^0-9A-Za-z]/gi, "").toUpperCase();
@@ -1663,7 +1719,7 @@ DubDub22 Minions`;
         dealerId = newDealer.rows[0].id;
       }
 
-      // DEBUG: disabled demo_ordered flag write — remove after debugging
+      // DEBUG: disabled demo_ordered flag write - remove after debugging
       // if (isDemoOrder) {
       //   await pool.query(
       //     `UPDATE dealers SET demo_ordered = true WHERE id = $1`,
@@ -1743,7 +1799,7 @@ DubDub22 Minions`;
         message ? `\nMessage:\n${message}` : "",
       ].filter(Boolean).join("\n");
 
-      // Only create a submission for inquiries — demo/stocking orders get their submission
+      // Only create a submission for inquiries - demo/stocking orders get their submission
       // created after T&C acceptance via /api/retail-order (prevents duplicate entries)
       let submissionId: string | null = null;
       if (isInquiry) {
@@ -1802,7 +1858,7 @@ DubDub22 Minions`;
             ? `To complete your dealer profile, please send us ${missingForms.join(" and ")}.${taxFormInstruction ? ` ${taxFormInstruction}` : ""}`
             : "");
 
-      // Send auto-reply to the dealer (orders only — inquiries get the Path 1-style email above)
+      // Send auto-reply to the dealer (orders only - inquiries get the Path 1-style email above)
       // For demo orders, suppress all emails until terms acceptance on order-confirmation page
       if (email && !isInquiry && !isDemoOrder && termsAccepted) {
         try {
@@ -1848,7 +1904,7 @@ DubDub22 Minions`;
   app.post("/api/dealer-terms-accepted", async (req, res) => {
     try {
       const { dealerName, dealerEmail, dealerPhone, orderType, quantity, signatureName, signatureDate } = req.body || {};
-      // Log the acceptance for now — no DB write needed yet
+      // Log the acceptance for now - no DB write needed yet
       console.log("Dealer terms accepted:", { dealerName, dealerEmail, orderType, quantity, signatureName, signatureDate });
       return res.json({ ok: true });
     } catch (err: any) {
@@ -1978,7 +2034,7 @@ DubDub22 Minions`;
       const isDemo = intent === "demo";
       const qty = isInfo ? null : quantity;
 
-      // Validate quantity for order intents — must be 1 (demo) or multiple of 5
+      // Validate quantity for order intents - must be 1 (demo) or multiple of 5
       if (!isInfo && qty) {
         const numQty = parseInt(qty, 10);
         if (isNaN(numQty) || numQty < 1 || numQty > 20 || (numQty !== 1 && numQty % 5 !== 0)) {
@@ -2053,7 +2109,7 @@ DubDub22 Minions`;
                 ``,
                 `Questions? Reply to this email or contact us at orders@dubdub22.com.`,
                 ``,
-                `— Double T Tactical — Floresville, TX — dubdub22.com`,
+                `- Double T Tactical - Floresville, TX - dubdub22.com`,
               ].filter(Boolean).join("\n"),
               replyTo: "orders@dubdub22.com",
             });
@@ -2100,8 +2156,8 @@ DubDub22 Minions`;
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             content: isInfo
-              ? `💬 **New Dealer Inquiry — ${contactName}**`
-              : `🛒 **New Dealer Order — ${contactName}**`,
+              ? `💬 **New Dealer Inquiry - ${contactName}**`
+              : `🛒 **New Dealer Order - ${contactName}**`,
             embeds: [{
               title: subjectLine,
               color: isInfo ? 0x666666 : 0xFF6600,
@@ -2179,7 +2235,7 @@ DubDub22 Minions`;
           });
         } catch (gmailErr) {
           console.error("retail_inquiry_gmail_error", gmailErr);
-          // Don't fail the request if email fails — inquiry is already saved
+          // Don't fail the request if email fails - inquiry is already saved
         }
       }
 
@@ -2413,7 +2469,7 @@ DubDub22 Minions`;
       } else if (source === "retail_inquiry") {
         await pool.query(`DELETE FROM retail_inquiries WHERE id = $1`, [id]);
       } else if (source === "dealer") {
-        // Mark the dealer's FFL upload as reviewed — hides it from the inquiry list
+        // Mark the dealer's FFL upload as reviewed - hides it from the inquiry list
         // without deleting any dealer data, FFL, SOT, or tax documents.
         await pool.query(`UPDATE dealers SET ffl_reviewed = true WHERE id = $1`, [id]);
       } else {
@@ -2520,7 +2576,7 @@ DubDub22 Minions`;
         to: dealer.email,
         bcc: BCC_EMAIL,
         from: `DubDub22 Documents <orders@dubdub22.com>`,
-        subject: `Action Required — DubDub22 Tax Form Upload`,
+        subject: `Action Required - DubDub22 Tax Form Upload`,
         text: [
           `Hi ${dealer.contact_name || dealer.business_name},`,
           ``,
@@ -2532,7 +2588,7 @@ DubDub22 Minions`;
           ``,
           `If you have any questions, reach us at info@dubdub22.com.`,
           ``,
-          `— DubDub22 Minions`,
+          `- DubDub22 Minions`,
         ].join("\n"),
         replyTo: SALES_EMAIL,
       });
@@ -2565,7 +2621,7 @@ DubDub22 Minions`;
         return res.status(400).json({ ok: false, error: "form_already_accepted" });
       }
       if (record.status === "uploaded") {
-        // Allow re-upload — just overwrite
+        // Allow re-upload - just overwrite
       }
 
       const taxFormErr = validateFileUpload(taxFormFileName, taxFormFileData);
@@ -2688,12 +2744,12 @@ DubDub22 Minions`;
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            content: `✅ **Tax Form Accepted** — ${record.dealer_name} (FFL: ${record.ffl_license_number || record.ffl_number})`,
+            content: `✅ **Tax Form Accepted** - ${record.dealer_name} (FFL: ${record.ffl_license_number || record.ffl_number})`,
             embeds: [{
               color: 0x22c55e,
               fields: [
                 { name: "Dealer", value: record.dealer_name, inline: true },
-                { name: "FFL", value: record.ffl_license_number || record.ffl_number || "—", inline: true },
+                { name: "FFL", value: record.ffl_license_number || record.ffl_number || "-", inline: true },
                 { name: "File", value: remoteName },
               ]
             }]
@@ -2742,7 +2798,7 @@ DubDub22 Minions`;
         to: record.email,
         bcc: BCC_EMAIL,
         from: `DubDub22 Documents <orders@dubdub22.com>`,
-        subject: `Action Required — DubDub22 Tax Form Update`,
+        subject: `Action Required - DubDub22 Tax Form Update`,
         text: [
           `Hi ${record.contact_name || record.business_name},`,
           ``,
@@ -2754,7 +2810,7 @@ DubDub22 Minions`;
           ``,
           `${uploadUrl}`,
           ``,
-          `— DubDub22 Minions`,
+          `- DubDub22 Minions`,
         ].filter(Boolean).join("\n"),
         replyTo: SALES_EMAIL,
       });
@@ -2913,7 +2969,7 @@ print(pdf_path)
         ``,
         `TOTAL: $${total.toFixed(2)}`,
         ``,
-        `— Thomas Trevino | Double T Tactical | 469-307-8001`,
+        `- Thomas Trevino | Double T Tactical | 469-307-8001`,
       ].filter(Boolean).join("\n");
 
       const attachment = pdfPath
@@ -2925,7 +2981,7 @@ print(pdf_path)
         to: toEmail,
         bcc: BCC_EMAIL,
         from: `DubDub22 Orders <orders@dubdub22.com>`,
-        subject: `INVOICE ${invoiceNumber} — DubDub22 Suppressor`,
+        subject: `INVOICE ${invoiceNumber} - DubDub22 Suppressor`,
         text: emailBody,
         attachment,
       });
@@ -2968,7 +3024,7 @@ print(pdf_path)
       const email = s.email;
       const businessName = s.business_name || "";
 
-      // Determine what's missing — check submission first, then dealer profile
+      // Determine what's missing - check submission first, then dealer profile
       const hasFfl = !!(s.ffl_file_name && s.ffl_file_data) || !!(s.dealer_ffl_file_name);
       const hasSot = !!(s.sot_file_name && s.sot_file_data) || !!(s.dealer_sot_file_name);
       const hasStateTax = !!(s.state_tax_file_name && s.state_tax_file_data) || !!(s.dealer_state_tax_file_name);
@@ -2982,7 +3038,7 @@ print(pdf_path)
         return res.json({ ok: true, message: "all_docs_on_file" });
       }
 
-      const subject = `Action Required: Additional Documents Needed — DubDub22 Order`;
+      const subject = `Action Required: Additional Documents Needed - DubDub22 Order`;
       const text = [
         `Hi ${contactName}${businessName ? ` (${businessName})` : ""},`,
         "",
@@ -2994,7 +3050,7 @@ print(pdf_path)
         "",
         "If you have any questions, don't hesitate to reach out.",
         "",
-        "— Double T Tactical",
+        "- Double T Tactical",
         "DubDub22 / Double T Tactical",
         "docs@dubdub22.com",
       ].join("\n");
@@ -3057,7 +3113,7 @@ print(pdf_path)
       if (!hasSot) missing.push("a signed copy of your SOT (Special Occupational Tax) form");
       if (!hasStateTax) missing.push("a completed Multi-State Tax Affidavit");
 
-      const subject = `Form 3 Submitted — DubDub22 Order`;
+      const subject = `Form 3 Submitted - DubDub22 Order`;
       const text = [
         `Hi ${contactName}${businessName ? ` (${businessName})` : ""},`,
         "",
@@ -3071,7 +3127,7 @@ print(pdf_path)
         "",
         "Thank you for choosing Double T Tactical / DubDub22.",
         "",
-        `— Double T Tactical`,
+        `- Double T Tactical`,
         `DubDub22 / Double T Tactical`,
         `docs@dubdub22.com`,
       ].filter(l => l !== null).join("\n");
@@ -3117,7 +3173,7 @@ print(pdf_path)
       await sendViaGmail({
         to: CONTACT_EMAIL,
         bcc: BCC_EMAIL,
-        subject: `CONTACT FORM — ${subject.toUpperCase()}`,
+        subject: `CONTACT FORM - ${subject.toUpperCase()}`,
         text: body,
         replyTo: email,
       });
@@ -3126,7 +3182,7 @@ print(pdf_path)
       await sendViaGmail({
         to: email,
         bcc: BCC_EMAIL,
-        subject: `WE RECEIVED YOUR MESSAGE — ${subject.toUpperCase()}`,
+        subject: `WE RECEIVED YOUR MESSAGE - ${subject.toUpperCase()}`,
         text: [
           `Hi ${name},`,
           ``,

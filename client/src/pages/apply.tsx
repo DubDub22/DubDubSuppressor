@@ -359,7 +359,7 @@ function PendingUpload(props: { fflNumber: string }) {
 
 // ─── Dealer Form (verified FFL — place order or inquiry) ───────────────────────
 
-function DealerForm(props: { fflNumber: string; dealerName?: string; email?: string; phone?: string }) {
+function DealerForm(props: { fflNumber: string; dealerName?: string; email?: string; phone?: string; address?: string; city?: string; state?: string; zip?: string }) {
   const { toast } = useToast();
   const [orderKind, setOrderKind] = useState<"inquiry" | "demo" | "stocking">("inquiry");
   const [quantityCans, setQuantityCans] = useState("5");
@@ -434,10 +434,10 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
       fflExpiry: "",
       ein: "",
       contactPhone: props.phone || "",
-      address: "",
-      city: "",
-      state: "",
-      zipCode: "",
+      address: props.address || "",
+      city: props.city || "",
+      state: props.state || "",
+      zipCode: props.zip || "",
       message: "",
     },
   });
@@ -753,6 +753,10 @@ export default function ApplyPage() {
   const dealerName = params.get("name") || "";
   const email = params.get("email") || "";
   const phone = params.get("phone") || "";
+  const address = params.get("address") || "";
+  const city = params.get("city") || "";
+  const state = params.get("state") || "";
+  const zip = params.get("zip") || "";
   const pending = params.get("pending") === "1";
 
   if (!ffl) {
@@ -798,7 +802,7 @@ export default function ApplyPage() {
             {pending ? (
               <PendingUpload fflNumber={ffl} />
             ) : (
-              <DealerForm fflNumber={ffl} dealerName={dealerName} email={email} phone={phone} />
+              <DealerForm fflNumber={ffl} dealerName={dealerName} email={email} phone={phone} address={address} city={city} state={state} zip={zip} />
             )}
           </motion.div>
         </div>
