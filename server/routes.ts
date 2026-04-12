@@ -757,6 +757,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET ffl_file_name = $1, ffl_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [fflFileName || "ffl-file", fflFileData, sub.rows[0].ffl_license_number]
         );
+        // Archive to 3dprintmanager via SFTP
+        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
+          fflFileData, fflFileName,
+          sotFileData: undefined, sotFileName: undefined,
+          resaleFileData: undefined, resaleFileName: undefined,
+          taxFormFileData: undefined, taxFormFileName: undefined,
+        }).catch(err => console.error("sftp_upload_ffl_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
@@ -782,6 +789,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET sot_file_name = $1, sot_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [sotFileName || "sot-file", sotFileData, sub.rows[0].ffl_license_number]
         );
+        // Archive to 3dprintmanager via SFTP
+        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
+          fflFileData: undefined, fflFileName: undefined,
+          sotFileData, sotFileName,
+          resaleFileData: undefined, resaleFileName: undefined,
+          taxFormFileData: undefined, taxFormFileName: undefined,
+        }).catch(err => console.error("sftp_upload_sot_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
@@ -807,6 +821,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET sales_tax_form_name = $1, sales_tax_form_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [taxFormName || "tax-form", taxFormData, sub.rows[0].ffl_license_number]
         );
+        // Archive to 3dprintmanager via SFTP (tax form maps to TaxUseForm)
+        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
+          fflFileData: undefined, fflFileName: undefined,
+          sotFileData: undefined, sotFileName: undefined,
+          resaleFileData: undefined, resaleFileName: undefined,
+          taxFormFileData, taxFormFileName,
+        }).catch(err => console.error("sftp_upload_taxform_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
@@ -832,6 +853,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET state_tax_file_name = $1, state_tax_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [stateTaxFileName || "state-tax-form", stateTaxFileData, sub.rows[0].ffl_license_number]
         );
+        // Archive to 3dprintmanager via SFTP (state tax maps to ResaleCert)
+        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
+          fflFileData: undefined, fflFileName: undefined,
+          sotFileData: undefined, sotFileName: undefined,
+          resaleFileData: stateTaxFileData, resaleFileName: stateTaxFileName,
+          taxFormFileData: undefined, taxFormFileName: undefined,
+        }).catch(err => console.error("sftp_upload_state_tax_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
