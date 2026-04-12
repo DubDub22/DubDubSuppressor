@@ -67,6 +67,7 @@ export class DatabaseStorage implements IStorage {
              s.sot_file_name,
              s.tax_form_name,
              s.state_tax_file_name,
+             s.form3_submitted_at,
              CASE WHEN i.id IS NOT NULL THEN true ELSE false END AS has_invoice,
              i.invoice_number,
              ds.order_type,
