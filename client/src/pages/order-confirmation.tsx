@@ -27,6 +27,10 @@ export default function OrderConfirmationPage() {
   const dealerContact = searchParams.get("contact") || dealerName;
   const dealerEmail = searchParams.get("email") || "";
   const dealerPhone = searchParams.get("phone") || "";
+  const customerAddress = searchParams.get("address") || "";
+  const customerCity = searchParams.get("city") || "";
+  const customerState = searchParams.get("state") || "";
+  const customerZip = searchParams.get("zip") || "";
 
   const [accepted, setAccepted] = useState(false);
   const [signatureName, setSignatureName] = useState("");
@@ -78,10 +82,10 @@ export default function OrderConfirmationPage() {
           quantity: String(unitCount),
           fflFileName: null,
           fflFileData: null,
-          customerAddress: null,
-          customerCity: null,
-          customerState: null,
-          customerZip: null,
+          customerAddress: customerAddress || null,
+          customerCity: customerCity || null,
+          customerState: customerState || null,
+          customerZip: customerZip || null,
           termsAccepted: true,
         }),
       });

@@ -505,6 +505,10 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
           contact: encodeURIComponent(values.contactName || ""),
           email: encodeURIComponent(values.email || ""),
           phone: encodeURIComponent(values.contactPhone || ""),
+          address: encodeURIComponent(values.address || ""),
+          city: encodeURIComponent(values.city || ""),
+          state: encodeURIComponent(values.state || ""),
+          zip: encodeURIComponent(values.zip || ""),
         });
         window.location.href = `/order-confirmation?${params.toString()}`;
         return;
