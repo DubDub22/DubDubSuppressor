@@ -2892,7 +2892,8 @@ DubDub22 Minions`;
       const subtotal = qty * unitPrice;
       const taxRate = 0.0825;
       const taxAmount = isWarranty ? parseFloat((subtotal * taxRate).toFixed(2)) : 0.0;
-      const total = subtotal + taxAmount;
+      const shippingCost = 10.0;
+      const total = subtotal + taxAmount + shippingCost;
 
       // Get next invoice number from shared counter
       const counterResult = await pool.query(
@@ -2907,20 +2908,21 @@ DubDub22 Minions`;
       let pdfPath = null;
       try {
         const args = JSON.stringify({
-          invoiceNumber,
-          customerName: customerName || "",
-          customerEmail: customerEmail || "",
-          customerPhone: customerPhone || "",
-          customerAddress: customerAddress || "",
-          customerCity: customerCity || "",
-          customerState: customerState || "",
-          customerZip: customerZip || "",
+          invoice_number: invoiceNumber,
+          customer_name: customerName || "",
+          customer_email: customerEmail || "",
+          customer_phone: customerPhone || "",
+          customer_address: customerAddress || "",
+          customer_city: customerCity || "",
+          customer_state: customerState || "",
+          customer_zip: customerZip || "",
           quantity: qty,
-          unitPrice,
-          subtotal,
-          taxAmount,
-          totalAmount: total,
-          isWarranty,
+          unit_price: unitPrice,
+          subtotal: subtotal,
+          tax_amount: taxAmount,
+          shipping_cost: shippingCost,
+          total_amount: total,
+          is_retail: isWarranty,
         });
         const pdfOut = execSync(`/home/dubdub/DubDub-Hub/venv/bin/python -c "
 import sys, json, os
@@ -2940,13 +2942,13 @@ print(pdf_path)
       // Save invoice record
       const insertResult = await pool.query(
         `INSERT INTO invoices
-           (invoice_number, dealer_id, submission_id, is_retail, retail_customer_name, retail_customer_email,
+           (invoice_number, submission_id, dealer_id, is_retail, retail_customer_name, retail_customer_email,
             retail_customer_phone, retail_customer_address, retail_customer_city,
             retail_customer_state, retail_customer_zip,
             quantity, unit_price, subtotal, tax_rate, tax_amount, total_amount, pdf_path, status, sent_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'sent', NOW())
          RETURNING id`,
-        [invoiceNumber, subDealerId || 0, submissionId || null, isWarranty,
+        [invoiceNumber, submissionId || null, subDealerId || null, isWarranty,
          customerName, customerEmail || null, customerPhone || null,
          customerAddress || null, customerCity || null, customerState || null, customerZip || null,
          qty, unitPrice, subtotal, taxRate, taxAmount, total, pdfPath]
