@@ -77,14 +77,8 @@ export class DatabaseStorage implements IStorage {
              d.state_tax_file_name AS dealer_state_tax_file_name
       FROM submissions s
       LEFT JOIN invoices i ON i.submission_id = s.id AND i.status = 'sent'
-      LEFT JOIN dealers d ON (
-        (d.ffl_license_number = s.ffl_license_number AND d.ffl_license_number IS NOT NULL AND d.ffl_license_number != '')
-        OR (
-          (s.ffl_license_number IS NULL OR s.ffl_license_number = '')
-          AND d.email ILIKE s.email AND d.email IS NOT NULL AND d.email != ''
-        )
-      )
       LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
+      LEFT JOIN dealers d ON d.id = ds.dealer_id
       WHERE ${includeArchived ? sql`1=1` : sql`s.archived = false`}
       ORDER BY s.created_at DESC
     `);
