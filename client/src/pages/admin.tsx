@@ -318,7 +318,7 @@ function fmtDate(d: string | Date) {
 
 function SubmissionsTab({
   submissions, isLoading, search, setSearch,
-  sortDir, setSortDir, showArchived, setShowArchived,
+  sortDir, setSortDir, sortBy, setSortBy, showArchived, setShowArchived,
   setArchiveTarget, setShipTarget, setInvoiceTarget, onFetchSubmissions
 }: {
   submissions: Submission[]; isLoading: boolean;
@@ -388,7 +388,7 @@ function SubmissionsTab({
           : filtered.length === 0 ? <p className="text-center py-8 text-muted-foreground">No submissions.</p>
           : filtered.map(sub => <SubmissionCard key={sub.id} sub={sub}
             onArchive={() => setArchiveTarget(sub)}
-            onDelete={() => setDeleteTarget(sub)}
+            onDelete={() => { console.log("delete card clicked", sub.id); setDeleteTarget(sub); }}
             onShip={() => setShipTarget(sub)}
             onInvoice={() => setInvoiceTarget(sub)} />)}
       </div>
@@ -412,7 +412,7 @@ function SubmissionsTab({
               : filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No submissions found.</td></tr>
               : filtered.map(sub => <SubmissionRow key={sub.id} sub={sub}
                 onArchive={() => setArchiveTarget(sub)}
-                onDelete={() => setDeleteTarget(sub)}
+                onDelete={() => { console.log("delete row clicked", sub.id); setDeleteTarget(sub); }}
                 onShip={() => setShipTarget(sub)}
                 onInvoice={() => setInvoiceTarget(sub)}
                 onRequestDocs={() => setRequestDocsTarget(sub)}
