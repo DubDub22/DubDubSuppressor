@@ -1736,23 +1736,40 @@ DubDub22 Minions`;
       // ───────────────────────────────────────────────────────────────
 
       // ── Auto-create or find dealer record ──────────────────────────
+      // Look up by FFL number first (immutable), then by email (can change)
       let dealerId: string;
       let dealerFormStatus = { fflOnFile: false, sotOnFile: false, taxFormOnFile: false };
-      const existingDealer = await pool.query(
-        `SELECT id, ffl_on_file, sot_on_file, tax_form_on_file FROM dealers WHERE email = $1 LIMIT 1`,
-        [email.toLowerCase()]
-      );
-      if (existingDealer.rows.length > 0) {
-        dealerId = existingDealer.rows[0].id;
+      let existingDealer: any = null;
+
+      // Try FFL number first (canonical key — unique, immutable)
+      if (fflNumber) {
+        const byFfl = await pool.query(
+          `SELECT id, ffl_on_file, sot_on_file, tax_form_on_file FROM dealers WHERE ffl_license_number = $1 LIMIT 1`,
+          [fflNumber]
+        );
+        if (byFfl.rows.length > 0) existingDealer = byFfl.rows[0];
+      }
+
+      // Fall back to email if FFL lookup didn't find anything
+      if (!existingDealer) {
+        const byEmail = await pool.query(
+          `SELECT id, ffl_on_file, sot_on_file, tax_form_on_file FROM dealers WHERE email = $1 LIMIT 1`,
+          [email.toLowerCase()]
+        );
+        if (byEmail.rows.length > 0) existingDealer = byEmail.rows[0];
+      }
+
+      if (existingDealer) {
+        dealerId = existingDealer.id;
         dealerFormStatus = {
-          fflOnFile: !!existingDealer.rows[0].ffl_on_file,
-          sotOnFile: !!existingDealer.rows[0].sot_on_file,
-          taxFormOnFile: !!existingDealer.rows[0].tax_form_on_file,
+          fflOnFile: !!existingDealer.ffl_on_file,
+          sotOnFile: !!existingDealer.sot_on_file,
+          taxFormOnFile: !!existingDealer.tax_form_on_file,
         };
-        // Upgrade to Preferred tier on any submission
+        // Update email if dealer has a new one, and upgrade tier
         await pool.query(
-          `UPDATE dealers SET tier = 'Preferred', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND tier = 'Standard'`,
-          [dealerId]
+          `UPDATE dealers SET email = $1, tier = 'Preferred', updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND tier = 'Standard'`,
+          [email.toLowerCase(), dealerId]
         );
       } else {
         const newDealer = await pool.query(
