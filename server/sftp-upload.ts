@@ -77,15 +77,33 @@ export function sftpUpload(
 
 /**
  * Build a folder name from an FFL number.
- * Format: FFL# with dashes removed, first 3 + last 5 digits.
- * e.g. "5-74-073-07-6G-07004" → "57470004"
+ * Scheme: first 3 digits + last 5 digits of the FFL license number (digits only).
+ * e.g. "5-48-009-07-7D-06170" → "54806170"
+ *      "1-05-073-07-8K-009807" → "10509807"
+ *      "6-01-001-01-8F-01148" → "60101148"
+ *      "1-62-107-01-6E-011545" → "16211545"
+ *
+ * IMPORTANT: This is the authoritative naming scheme for ALL dealer SFTP folders.
+ * Do not change this without updating all existing folders.
  */
 export function fflToFolderName(fflNumber: string): string {
-  const digits = fflNumber.replace(/-/g, "");
-  // Take first 3 and last 5 digits
-  const first = digits.slice(0, 3).replace(/^0+/, "") || "0";
-  const last = digits.slice(-5).padStart(5, "0");
+  const digitsOnly = fflNumber.replace(/[^0-9]/g, "");
+  const first = digitsOnly.slice(0, 3);  // first 3 digits (keep leading zeros)
+  const last  = digitsOnly.slice(-5);     // last 5 digits
   return first + last;
+}
+
+/**
+ * Build a standard file name for a dealer document.
+ * Format: {folderSuffix}{type}.{ext}
+ * e.g. "16211545FFL.pdf", "54806170SOT.jpg", "10509807TNResaleCert.png"
+ *
+ * The type comes AFTER the folder suffix (not before).
+ * Types: FFL, SOT, ST, TNResaleCert, ResaleCert, TaxUseForm
+ */
+export function dealerDocFileName(type: "FFL" | "SOT" | "ST" | "TNResaleCert" | "ResaleCert" | "TaxUseForm", fflNumber: string, ext: string): string {
+  const folder = fflToFolderName(fflNumber);
+  return `${folder}${type}.${ext.replace(/^\./, "")}`;
 }
 
 export interface DealerDocumentFiles {
@@ -109,50 +127,48 @@ export interface DealerDocumentFiles {
  *
  * folderName = FFL# first 3 + last 5 digits (e.g. 57470004)
  */
+/**
+ * Upload dealer documents to 3dprintmanager via SFTP.
+ * Folder naming: FFL first 3 + last 5 digits (e.g. "16211545")
+ * File naming: {type}{suffix}.{ext} (e.g. "FFL16211545.pdf", "SOT06170.jpg")
+ */
 export async function uploadDealerDocuments(
   fflNumber: string,
   files: DealerDocumentFiles
 ): Promise<void> {
   const safeFflNumber = fflNumber.replace(/[^a-zA-Z0-9\-]/g, '');
   const folder = fflToFolderName(safeFflNumber);
+  const suffix  = folder; // same as fflToFolderName output
   const basePath = `/home/dealer-uploader/dealer-docs/${folder}`;
-  const fflDigits = safeFflNumber.replace(/-/g, "");
 
   const uploads: Promise<void>[] = [];
 
   if (files.fflFileData && files.fflFileName) {
-    const ext = files.fflFileName.split(".").pop()?.toLowerCase() || "pdf";
+    const ext = (files.fflFileName.split(".").pop() || "pdf").toLowerCase();
     uploads.push(
-      sftpUpload(Buffer.from(files.fflFileData, "base64"), `${basePath}/FFL${fflDigits}.${ext}`).catch(err =>
-        console.error("sftp_upload_ffl_error", err)
-      )
+      sftpUpload(Buffer.from(files.fflFileData, "base64"), `${basePath}/${suffix}FFL.${ext}`)
+        .catch(err => console.error("sftp_upload_ffl_error", err))
     );
   }
-
   if (files.sotFileData && files.sotFileName) {
-    const ext = files.sotFileName.split(".").pop()?.toLowerCase() || "pdf";
+    const ext = (files.sotFileName.split(".").pop() || "pdf").toLowerCase();
     uploads.push(
-      sftpUpload(Buffer.from(files.sotFileData, "base64"), `${basePath}/SOT${fflDigits}.${ext}`).catch(err =>
-        console.error("sftp_upload_sot_error", err)
-      )
+      sftpUpload(Buffer.from(files.sotFileData, "base64"), `${basePath}/${suffix}SOT.${ext}`)
+        .catch(err => console.error("sftp_upload_sot_error", err))
     );
   }
-
   if (files.resaleFileData && files.resaleFileName) {
-    const ext = files.resaleFileName.split(".").pop()?.toLowerCase() || "pdf";
+    const ext = (files.resaleFileName.split(".").pop() || "pdf").toLowerCase();
     uploads.push(
-      sftpUpload(Buffer.from(files.resaleFileData, "base64"), `${basePath}/ResaleCert${fflDigits}.${ext}`).catch(err =>
-        console.error("sftp_upload_resale_error", err)
-      )
+      sftpUpload(Buffer.from(files.resaleFileData, "base64"), `${basePath}/${suffix}ResaleCert.${ext}`)
+        .catch(err => console.error("sftp_upload_resale_error", err))
     );
   }
-
   if (files.taxFormFileData && files.taxFormFileName) {
-    const ext = files.taxFormFileName.split(".").pop()?.toLowerCase() || "pdf";
+    const ext = (files.taxFormFileName.split(".").pop() || "pdf").toLowerCase();
     uploads.push(
-      sftpUpload(Buffer.from(files.taxFormFileData, "base64"), `${basePath}/TaxUseForm${fflDigits}.${ext}`).catch(err =>
-        console.error("sftp_upload_taxform_error", err)
-      )
+      sftpUpload(Buffer.from(files.taxFormFileData, "base64"), `${basePath}/${suffix}TaxUseForm.${ext}`)
+        .catch(err => console.error("sftp_upload_taxform_error", err))
     );
   }
 
