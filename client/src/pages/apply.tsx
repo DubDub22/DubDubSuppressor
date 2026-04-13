@@ -3,7 +3,8 @@ import { useSearchParams } from "wouter";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 
-import { CheckCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Loader2, UploadCloud, X } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,56 @@ interface DealerApplyValues {
   message: string;
 }
 
+// ─── Upload Field Helper ─────────────────────────────────────────────────────
+function UploadField({
+  id,
+  accept,
+  file,
+  onFileChange,
+  error,
+}: {
+  id: string;
+  accept: string;
+  file: File | null;
+  onFileChange: (f: File | null) => void;
+  error?: string;
+}) {
+  return (
+    <div className="relative">
+      <div className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-lg transition-colors duration-200 cursor-pointer overflow-hidden ${error ? "border-red-500 bg-red-500/5" : "border-border hover:border-primary/40 bg-card"}`}>
+        <Input
+          id={id}
+          type="file"
+          accept={accept}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 file:cursor-pointer"
+          onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+        />
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center z-0 pointer-events-none">
+          {file ? (
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+              <span className="text-sm text-foreground truncate max-w-[200px]">{file.name}</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onFileChange(null); }}
+                className="text-muted-foreground hover:text-destructive ml-1 shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <UploadCloud className="w-5 h-5 mb-1 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Click or drop</span>
+            </>
+          )}
+        </div>
+      </div>
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Pending FFL Upload (dealer not in database) ────────────────────────────────
 
 function PendingUpload(props: { fflNumber: string }) {
@@ -37,6 +88,9 @@ function PendingUpload(props: { fflNumber: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [fflSegs, setFflSegs] = useState(["", "", "", "", "", ""]);
   const [fflError, setFflError] = useState("");
+  const [fflHasSot, setFflHasSot] = useState(false);
+  const [fflFile, setFflFile] = useState<File | null>(null);
+  const [sotFile, setSotFile] = useState<File | null>(null);
 
   type PendingValues = {
     dealerName: string;
@@ -83,9 +137,29 @@ function PendingUpload(props: { fflNumber: string }) {
       setFflError("Please fill in all FFL number segments");
       return;
     }
+    if (!fflFile) {
+      toast({ title: "Missing FFL", description: "Please upload your FFL document.", variant: "destructive" });
+      return;
+    }
+    if (!fflHasSot && !sotFile) {
+      toast({ title: "Missing SOT", description: "Please upload your SOT document, or check the box if your FFL has SOT on the same page.", variant: "destructive" });
+      return;
+    }
     setFflError("");
     setSubmitting(true);
     try {
+      // Convert files to base64
+      const toBase64 = (f: File): Promise<string> =>
+        new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res((r.result as string).split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(f);
+        });
+
+      const fflBase64 = await toBase64(fflFile);
+      const sotBase64 = sotFile ? await toBase64(sotFile) : null;
+
       const resp = await fetch("/api/ffl/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,6 +174,10 @@ function PendingUpload(props: { fflNumber: string }) {
           state: values.state,
           zipCode: values.zipCode,
           message: values.message || null,
+          fflFileName: fflFile.name,
+          fflFileData: fflBase64,
+          sotFileName: sotFile ? sotFile.name : null,
+          sotFileData: sotBase64,
         }),
       });
       const data = await resp.json();
@@ -338,6 +416,54 @@ function PendingUpload(props: { fflNumber: string }) {
           )}
         />
 
+        {/* ── File Uploads ── */}
+        <div className="space-y-4 p-4 rounded-lg border border-border bg-card/50">
+          <p className="text-sm font-medium">Required Documents</p>
+
+          {/* FFL Upload */}
+          <div className="space-y-1">
+            <label className="text-xs font-medium">
+              FFL <span className="text-red-400">*</span>
+            </label>
+            <UploadField
+              id="pending-ffl-upload"
+              accept=".pdf,.png,.jpg,.jpeg"
+              file={fflFile}
+              onFileChange={(f) => {
+                setFflFile(f);
+                setFflError("");
+              }}
+              error={!fflFile ? fflError : ""}
+            />
+          </div>
+
+          {/* FFL has SOT combined checkbox */}
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={fflHasSot}
+              onChange={(e) => setFflHasSot(e.target.checked)}
+              className="accent-primary"
+            />
+            My FFL has SOT combined on the same page
+          </label>
+
+          {/* SOT Upload — required only if FFL does NOT have SOT combined */}
+          {!fflHasSot && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium">
+                SOT <span className="text-red-400">*</span>
+              </label>
+              <UploadField
+                id="pending-sot-upload"
+                accept=".pdf,.png,.jpg,.jpeg"
+                file={sotFile}
+                onFileChange={setSotFile}
+              />
+            </div>
+          )}
+        </div>
+
         <Button
           type="submit"
           disabled={submitting}
@@ -366,6 +492,9 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [hasDemoUnitShipped, setHasDemoUnitShipped] = useState(false);
+  const [fflHasSot, setFflHasSot] = useState(false);
+  const [fflFile, setFflFile] = useState<File | null>(null);
+  const [sotFile, setSotFile] = useState<File | null>(null);
 
   // Check if dealer already received a demo unit — if so, hide the demo option
   React.useEffect(() => {
@@ -459,13 +588,36 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
       toast({ title: "Invalid FFL", description: "FFL number must be 15 characters.", variant: "destructive" });
       return;
     }
+    if (!fflFile) {
+      toast({ title: "Missing FFL", description: "Please upload your FFL document.", variant: "destructive" });
+      return;
+    }
+    if (!fflHasSot && !sotFile) {
+      toast({ title: "Missing SOT", description: "Please upload your SOT document, or check the box if your FFL has SOT on the same page.", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
+      const toBase64 = (f: File): Promise<string> =>
+        new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res((r.result as string).split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(f);
+        });
+
+      const fflBase64 = await toBase64(fflFile);
+      const sotBase64 = sotFile ? await toBase64(sotFile) : null;
+
       const { confirmEmail, fflNumber: _fflNumber, ...rest } = values;
       const body: Record<string, unknown> = {
         ...rest,
         fflNumber: fullFfl,
         orderKind,
+        fflFileName: fflFile.name,
+        fflFileData: fflBase64,
+        sotFileName: sotFile ? sotFile.name : null,
+        sotFileData: sotBase64,
       };
 
       if (orderKind !== "inquiry") {
@@ -723,6 +875,50 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
             </FormItem>
           )} />
         )}
+
+        {/* ── File Uploads (all order types) ── */}
+        <div className="space-y-4 p-4 rounded-lg border border-border bg-card/50">
+          <p className="text-sm font-medium">Required Documents</p>
+
+          {/* FFL Upload */}
+          <div className="space-y-1">
+            <label className="text-xs font-medium">
+              FFL <span className="text-red-400">*</span>
+            </label>
+            <UploadField
+              id="df-ffl-upload"
+              accept=".pdf,.png,.jpg,.jpeg"
+              file={fflFile}
+              onFileChange={setFflFile}
+            />
+          </div>
+
+          {/* FFL has SOT combined checkbox */}
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={fflHasSot}
+              onChange={(e) => setFflHasSot(e.target.checked)}
+              className="accent-primary"
+            />
+            My FFL has SOT combined on the same page
+          </label>
+
+          {/* SOT Upload — required only if FFL does NOT have SOT combined */}
+          {!fflHasSot && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium">
+                SOT <span className="text-red-400">*</span>
+              </label>
+              <UploadField
+                id="df-sot-upload"
+                accept=".pdf,.png,.jpg,.jpeg"
+                file={sotFile}
+                onFileChange={setSotFile}
+              />
+            </div>
+          )}
+        </div>
 
         {/* ── Submit ── */}
         <Button
