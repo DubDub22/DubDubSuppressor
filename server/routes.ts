@@ -3303,9 +3303,8 @@ print(pdf_path)
       const hasSot = !!(s.sot_file_name && s.sot_file_data) || !!(s.dealer_sot_file_name);
       const hasStateTax = !!(s.state_tax_file_name && s.state_tax_file_data) || !!(s.dealer_state_tax_file_name);
 
+      // FFL and SOT must already be on file before Form 3 can be submitted — only check for missing tax docs
       const missing: string[] = [];
-      if (!hasFfl) missing.push("a signed copy of your FFL (Federal Firearms License)");
-      if (!hasSot) missing.push("a signed copy of your SOT (Special Occupational Tax) form");
       if (!hasStateTax) missing.push("a completed Multi-State Tax Affidavit");
 
       const subject = `Form 3 Submitted - DubDub22 Order`;
