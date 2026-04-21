@@ -3012,12 +3012,13 @@ export default function AdminPage() {
 
   const pinForm = useForm<z.infer<typeof pinSchema>>({ resolver: zodResolver(pinSchema), defaultValues: { pin: "" } });
 
-  const fetchSubmissions = useCallback(async () => {
+  const fetchSubmissions = useCallback(async (tabOverride?: string) => {
+    const activeTab = tabOverride ?? tab;
     try {
       setIsLoading(true);
       // Archives tab always needs archived submissions; submissions tab respects showArchived toggle
-      const includeArchived = tab === "archives" ? true : showArchived;
-      const res = await fetch(`/api/admin/submissions?includeArchived=${includeArchived}`);
+      const includeArchived = activeTab === "archives" ? true : showArchived;
+      const res = await fetch(`/api/admin/submissions?includeArchived=${includeArchived}&_=${Date.now()}`);
       if (res.status === 403) { setAuthStatus("needs_pin"); setIsLoading(false); return; }
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
@@ -3026,7 +3027,7 @@ export default function AdminPage() {
       setAuthStatus("authorized");
     } catch (err: any) { toast({ title: "Error", description: err.message, variant: "destructive" }); }
     finally { setIsLoading(false); }
-  }, [showArchived]);
+  }, [tab, showArchived]);
 
   const fetchDealers = useCallback(async () => {
     try {
@@ -3329,7 +3330,7 @@ export default function AdminPage() {
             <FileText className="w-4 h-4 inline mr-1.5" />Tax Forms
           </button>
           <button
-            onClick={() => { setTab("archives"); }}
+            onClick={() => { setTab("archives"); fetchSubmissions("archives"); }}
             className={`pb-3 px-3 text-sm font-medium border-b-2 transition-colors ${
               tab === "archives" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
@@ -3426,7 +3427,7 @@ export default function AdminPage() {
         {tab === "archives" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Archived Submissions</h2>
+              <h2 className="text-xl font-semibold">Archived Submissions <span className="text-sm font-normal text-muted-foreground">(total: {submissions.length}, archived: {submissions.filter(s=>s.archived).length})</span></h2>
               <select
                 value={archivedFromFilter}
                 onChange={e => setArchivedFromFilter(e.target.value)}
