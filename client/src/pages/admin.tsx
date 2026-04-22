@@ -153,7 +153,8 @@ const dealerFormSchema = z.object({
     .regex(/^\d-\d{2}-\d{3}-\d{2}-\d{2}-\d{5}$/, {
       message: "FFL must be in format X-XX-XXX-XX-XX-XXXXX (15 digits, dashes only)."
     })
-    .optional(),
+    .optional()
+    .or(z.literal("")),
   fflLicenseType: z.string().optional(),
   fflExpiry: z.string().optional(),
   fflLoaExpiry: z.string().optional(),
