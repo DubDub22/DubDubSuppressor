@@ -233,9 +233,10 @@ function DocBadge({ type, fileName, fileData, orDealerFileData, submissionId, ff
   };
 
   if (hasFile) {
-    // Green badge — file confirmed archived on SFTP. Non-clickable.
+    // Green badge — file confirmed on SFTP. Click to view in new tab.
+    const viewUrl = `/api/admin/submissions/${submissionId}/file/${type}?ffl=${encodeURIComponent(fflLicenseNumber || "")}&created=${encodeURIComponent(createdAt || "")}`;
     return (
-      <span className={`text-xs px-2 py-0.5 rounded font-bold ${colors[type]}`}>{label}</span>
+      <a href={viewUrl} target="_blank" rel="noopener noreferrer" className={`text-xs px-2 py-0.5 rounded font-bold ${colors[type]} hover:underline`}>{label}</a>
     );
   } else {
     // Missing — click to upload
@@ -735,7 +736,14 @@ function DealersTab({ dealers, isLoading, onSelect, onAddNew }: {
           <Building2 className="w-4 h-4" /> Add Dealer
         </Button>
         <Button variant="outline" onClick={async () => {
-          await fetch("/api/admin/dealers/link-submissions", { method: "POST" });
+          try {
+            const res = await fetch("/api/admin/dealers/link-submissions", { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Link failed");
+            toast({ title: "Linked!", description: "Submissions linked to dealers." });
+          } catch (err: any) {
+            toast({ title: "Link Failed", description: err.message, variant: "destructive" });
+          }
         }} className="h-9 text-sm">
           Link Submissions
         </Button>
@@ -1034,6 +1042,9 @@ function DealerDetail({
         sotFileData: sotFileData || undefined,
         fflFileName,
         fflFileData: fflFileData || undefined,
+        // Set on-file flags when files are present
+        fflOnFile: !!(fflFileData || dealer.fflFileData),
+        sotOnFile: !!(sotFileData || dealer.sotFileData),
       };
 
       const res = await fetch(`/api/admin/dealers/${dealer.id}`, {
@@ -1064,7 +1075,7 @@ function DealerDetail({
       await fetch(`/api/admin/dealers/${dealer.id}/sales-tax-form`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ salesTaxFormName: taxFile.name, salesTaxFormData: fileData }),
+        body: JSON.stringify({ salesTaxFormName: taxFile.name, salesTaxFormData: fileData, taxFormOnFile: true }),
       });
       toast({ title: "Tax Form Saved!", description: "Sales tax exemption form uploaded." });
     } catch {
@@ -1695,6 +1706,30 @@ function AddDealerDialog({ open, onClose, onAdd }: { open: boolean; onClose: () 
                 render={({ field }) => (
                   <FormItem><FormLabel>EIN</FormLabel>
                     <FormControl><Input {...field} placeholder="XX-XXXXXXX" className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="fflLicenseNumber"
+                render={({ field }) => (
+                  <FormItem className="col-span-2"><FormLabel>FFL License Number</FormLabel>
+                    <FormControl><Input {...field} placeholder="X-XX-XXX-XX-XX-XXXXX" className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="fflExpiry"
+                render={({ field }) => (
+                  <FormItem><FormLabel>FFL Expiry</FormLabel>
+                    <FormControl><Input {...field} placeholder="MM/DD/YYYY" className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="sotLicenseType"
+                render={({ field }) => (
+                  <FormItem><FormLabel>SOT License Type</FormLabel>
+                    <FormControl><Input {...field} placeholder="e.g. Type 2" className="bg-background" /></FormControl>
+                    <FormMessage /></FormItem>
+                )} />
+              <FormField control={form.control} name="sotTaxYear"
+                render={({ field }) => (
+                  <FormItem><FormLabel>SOT Tax Year</FormLabel>
+                    <FormControl><Input {...field} placeholder="e.g. 2025" className="bg-background" /></FormControl>
                     <FormMessage /></FormItem>
                 )} />
             </div>

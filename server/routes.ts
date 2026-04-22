@@ -639,34 +639,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ ok: false, error: "missing_ffl_or_created" });
       }
 
-      const suffixMap: Record<string, string> = {
-        ffl: "ffl",
-        sot: "sot",
-        tax: "tax_form",
-        state_tax: "state_tax",
+      // File naming matches uploadDealerDocuments: {folder}{TYPE}.{ext}
+      // e.g. 54806170FFL.pdf, 54806170SOT.pdf, 54806170TaxUseForm.pdf, 54806170ResaleCert.pdf
+      const typeToFileType: Record<string, string> = {
+        ffl: "FFL",
+        sot: "SOT",
+        tax: "TaxUseForm",
+        state_tax: "TNResaleCert",
       };
-      const suffix = suffixMap[type];
-      if (!suffix) return res.status(400).json({ ok: false, error: "invalid_type" });
+      const fileType = typeToFileType[type];
+      if (!fileType) return res.status(400).json({ ok: false, error: "invalid_type" });
 
       // Use sub-{id} folder if ffl is empty/NOFFL, otherwise use FFL-based folder
       const rawFolder = fflToFolderName(ffl);
       const folder = (rawFolder === "NOFFL" || !ffl) ? `sub-${id}` : rawFolder;
-      const dateStr = (created as string).split("T")[0].replace(/-/g, "");
-      // Try both .pdf and .png extensions
-      const remotePath = `/home/dealer-uploader/dealer-docs/${folder}/${suffix}_${dateStr}.pdf`;
+      // Try .pdf and .png extensions (state_tax may be image)
+      const remotePath = `/home/dealer-uploader/dealer-docs/${folder}/${folder}${fileType}.pdf`;
 
       try {
         const buf = await sftpRead(remotePath);
-        const contentType = type === "state_tax" && remotePath.endsWith(".png")
-          ? "image/png"
-          : "application/pdf";
+        const contentType = "application/pdf";
         res.setHeader("Content-Type", contentType);
         res.setHeader("Content-Disposition", `inline; filename=\"${type}_${id}.pdf\"`);
         res.setHeader("Content-Length", buf.length);
         res.end(buf);
       } catch (err: any) {
         // Try .png fallback
-        const pngPath = `/home/dealer-uploader/dealer-docs/${folder}/${suffix}_${dateStr}.png`;
+        const pngPath = `/home/dealer-uploader/dealer-docs/${folder}/${folder}${fileType}.png`;
         try {
           const buf = await sftpRead(pngPath);
           res.setHeader("Content-Type", "image/png");
