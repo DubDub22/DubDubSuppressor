@@ -240,7 +240,7 @@ function DocBadge({ type, fileName, fileData, orDealerFileData, submissionId, ff
 
   if (hasFile) {
     // Green badge — file confirmed on SFTP. Click to view in new tab.
-    const viewUrl = `/api/admin/submissions/${submissionId}/file/${type}?ffl=${encodeURIComponent(fflLicenseNumber || "")}&created=${encodeURIComponent(createdAt || "")}`;
+    const viewUrl = `/api/admin/submissions/${submissionId}/file/${type}`;
     return (
       <a href={viewUrl} target="_blank" rel="noopener noreferrer" className={`text-xs px-2 py-0.5 rounded font-bold ${colors[type]} hover:underline`}>{label}</a>
     );
