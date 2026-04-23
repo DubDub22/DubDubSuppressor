@@ -727,9 +727,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!trackingNumber?.trim()) {
         return res.status(400).json({ ok: false, error: "tracking_number_required" });
       }
-      // Look up the submission first - if it's a demo (type=dealer, qty=1), lock the demo flag
-      const sub = await pool.query(`SELECT ds.dealer_id, s.type, s.quantity FROM submissions s JOIN dealer_submissions ds ON ds.submission_id = s.id WHERE s.id = $1 LIMIT 1`, [id]);
-      const dealerId = sub.rows[0]?.dealer_id;
+      // Look up full submission to check form3SubmittedAt and for Form 3 PDF generation
+      const rows = await pool.query(`
+        SELECT ds.dealer_id, s.type, s.quantity, s.ffl_license_number, s.business_name,
+          s.contact_name, s.customer_address, s.customer_city, s.customer_state, s.customer_zip,
+          s.form3_submitted_at
+        FROM submissions s
+        LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
+        WHERE s.id = $1 LIMIT 1
+      `, [id]);
+      if (!rows.rows.length) return res.status(404).json({ ok: false, error: "submission_not_found" });
+      const s = rows.rows[0];
+      // Require Form 3 to be submitted before marking as shipped
+      if (!s.form3_submitted_at) {
+        return res.status(400).json({ ok: false, error: "form3_not_submitted" });
+      }
+      const dealerId = s.dealer_id;
+
+      // Update shipped status
       await pool.query(
         `UPDATE submissions SET tracking_number = $1, atf_form_name = $2, atf_form_data = $3, shipped_at = NOW()::text WHERE id = $4`,
         [trackingNumber.trim(), atfFormName || null, atfFormData || null, id]
@@ -737,6 +752,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (dealerId) {
         await pool.query(`UPDATE dealers SET has_demo_unit_shipped = true WHERE id = $1`, [dealerId]);
       }
+
+      // ── Generate Form 3 PDF and upload to SFTP ──────────────────────────────
+      if (s.ffl_license_number) {
+        try {
+          const form3Date = new Date().toISOString().split("T")[0];
+          const form3Args = JSON.stringify({
+            ffl_number: s.ffl_license_number || "",
+            business_name: s.business_name || "",
+            contact_name: s.contact_name || "",
+            address: s.customer_address || "",
+            city: s.customer_city || "",
+            state: s.customer_state || "",
+            zip: s.customer_zip || "",
+          });
+          let form3Path: string | null = null;
+          try {
+            const form3Out = execSync(`/home/dubdub/DubDub-Hub/venv/bin/python -c "
+import sys, json
+sys.path.insert(0, '/home/dubdub/DubDub-Hub')
+from bot.services.form3_generator import generate_form3_pdf
+params = json.loads(sys.argv[1])
+path = generate_form3_pdf(**params)
+print(path)" '${form3Args}'`, { encoding: "utf8" }).trim();
+            if (form3Out && fs.existsSync(form3Out.trim())) {
+              form3Path = form3Out.trim();
+            }
+          } catch (e: any) {
+            console.warn("Form3 PDF generation failed:", e.message);
+          }
+          if (form3Path) {
+            const dateTag = form3Date.replace(/-/g, "");
+            const folder = fflToFolderName(s.ffl_license_number);
+            const sftpDest = `/home/dealer-uploader/dealer-docs/${folder}/${folder}Form3_${dateTag}.pdf`;
+            const { sftpUpload } = await import("./sftp-upload");
+            await sftpUpload(fs.readFileSync(form3Path), sftpDest);
+            console.log(`[form3] uploaded to SFTP: ${sftpDest}`);
+          }
+        } catch (e: any) {
+          console.error("form3 sftp upload failed:", e.message);
+        }
+      }
+
       return res.json({ ok: true });
     } catch (err: any) {
       console.error("ship_submission_error", err);
@@ -3415,45 +3472,6 @@ print(pdf_path)
 
       // Record that Form 3 was submitted
       await pool.query(`UPDATE submissions SET form3_submitted_at = $1 WHERE id = $2`, [new Date().toISOString(), id]);
-
-      // ── Upload Form 3 PDF to SFTP ──────────────────────────────────────────
-      try {
-        const form3Date = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-        const form3Args = JSON.stringify({
-          ffl_number: s.ffl_license_number || "",
-          business_name: businessName || "",
-          contact_name: contactName || "",
-          address: s.customer_address || s.business_address || "",
-          city: s.customer_city || "",
-          state: s.customer_state || "",
-          zip: s.customer_zip || "",
-        });
-        let form3Path: string | null = null;
-        try {
-          const form3Out = execSync(`/home/dubdub/DubDub-Hub/venv/bin/python -c "
-import sys, json
-sys.path.insert(0, '/home/dubdub/DubDub-Hub')
-from bot.services.form3_generator import generate_form3_pdf
-params = json.loads(sys.argv[1])
-path = generate_form3_pdf(**params)
-print(path)" '${form3Args}'`, { encoding: "utf8" }).trim();
-          if (form3Out && fs.existsSync(form3Out.trim())) {
-            form3Path = form3Out.trim();
-          }
-        } catch (e: any) {
-          console.warn("Form3 PDF generation failed:", e.message);
-        }
-        if (form3Path && s.ffl_license_number) {
-          const dateTag = form3Date.replace(/-/g, "");
-          const folder = fflToFolderName(s.ffl_license_number);
-          const sftpDest = `/home/dealer-uploader/dealer-docs/${folder}/${folder}Form3_${dateTag}.pdf`;
-          const { sftpUpload } = await import("./sftp-upload");
-          await sftpUpload(fs.readFileSync(form3Path), sftpDest);
-          console.log(`[form3] uploaded to SFTP: ${sftpDest}`);
-        }
-      } catch (e: any) {
-        console.error("form3 sftp upload failed:", e.message);
-      }
 
       return res.json({ ok: true, missing: missing.length });
     } catch (err: any) {

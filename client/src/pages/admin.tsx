@@ -523,13 +523,10 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
             <Button
               variant="outline"
               size="sm"
-              className={`w-full h-8 text-xs ${sub.trackingNumber
-                ? "border-green-600 text-green-600 hover:bg-green-50"
-                : "border-primary text-primary hover:bg-primary/10"
-              }`}
-              onClick={sub.trackingNumber ? undefined : onShip}
+              className={`w-full h-8 text-xs ${!sub.form3SubmittedAt ? "border-gray-400 text-gray-400 cursor-not-allowed" : (sub.trackingNumber ? "border-green-600 text-green-600 hover:bg-green-50" : "border-primary text-primary hover:bg-primary/10")}`}
+              onClick={!sub.form3SubmittedAt ? undefined : (sub.trackingNumber ? undefined : onShip)}
             >
-              {sub.trackingNumber ? "✓ Shipped" : "Mark as Shipped"}
+              {sub.trackingNumber ? "✓ Shipped" : (!sub.form3SubmittedAt ? "Awaiting Form 3" : "Mark as Shipped")}
             </Button>
             <Button
               variant="outline"
@@ -636,13 +633,11 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestD
             <Button
               variant="outline"
               size="sm"
-              className={`h-7 text-xs whitespace-nowrap ${sub.trackingNumber
-                ? "border-green-600 text-green-600 hover:bg-green-50"
-                : "border-primary text-primary hover:bg-primary/10"
-              }`}
-              onClick={sub.trackingNumber ? undefined : onShip}
+              className={`h-7 text-xs whitespace-nowrap ${!sub.form3SubmittedAt ? "border-gray-400 text-gray-400 cursor-not-allowed" : (sub.trackingNumber ? "border-green-600 text-green-600 hover:bg-green-50" : "border-primary text-primary hover:bg-primary/10")}`}
+              onClick={!sub.form3SubmittedAt ? undefined : (sub.trackingNumber ? undefined : onShip)}
+              title={!sub.form3SubmittedAt ? "Form 3 must be sent before marking shipped" : (sub.trackingNumber ? "Already shipped" : "Mark as shipped")}
             >
-              {sub.trackingNumber ? "✓ Shipped" : "Mark Shipped"}
+              {sub.trackingNumber ? "✓ Shipped" : (!sub.form3SubmittedAt ? "Awaiting Form 3" : "Mark Shipped")}
             </Button>
           </div>
         )}
