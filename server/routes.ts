@@ -621,16 +621,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id, type } = req.params;
       let { ffl } = req.query as { ffl?: string };
 
-      // If ffl missing, look up from DB
+      // If ffl missing, look up from submission's dealer (via dealer_submissions join), then fall back to submission's own ffl
       if (!ffl) {
         const rows = await pool.query(
-          `SELECT ffl_license_number FROM submissions WHERE id = $1 LIMIT 1`,
+          `SELECT s.ffl_license_number, ds.dealer_id, d.ffl_license_number AS dealer_ffl_num
+           FROM submissions s
+           LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
+           LEFT JOIN dealers d ON d.id = ds.dealer_id
+           WHERE s.id = $1 LIMIT 1`,
           [id]
         );
         if (rows.rows.length === 0) {
           return res.status(404).json({ ok: false, error: "submission_not_found" });
         }
-        ffl = rows.rows[0].ffl_license_number || undefined;
+        const row = rows.rows[0];
+        // Prefer dealer's FFL number (for linked dealers), fall back to submission's own FFL
+        ffl = row.dealer_ffl_num || row.ffl_license_number || undefined;
       }
 
       // File naming matches uploadDealerDocuments: {folder}{TYPE}.{ext}
