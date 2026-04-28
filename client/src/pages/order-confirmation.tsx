@@ -67,16 +67,11 @@ export default function OrderConfirmationPage() {
 
     setAccepting(true);
     try {
-      // Retrieve file data stored by the order or apply page
-      const pendingFflFileName = sessionStorage.getItem("pendingFflFileName");
-      const pendingFflFileData = sessionStorage.getItem("pendingFflFileData");
-      const pendingSotFileName = sessionStorage.getItem("pendingSotFileName");
-      const pendingSotFileData = sessionStorage.getItem("pendingSotFileData");
-      // Clear stored file data after retrieving
-      sessionStorage.removeItem("pendingFflFileName");
-      sessionStorage.removeItem("pendingFflFileData");
-      sessionStorage.removeItem("pendingSotFileName");
-      sessionStorage.removeItem("pendingSotFileData");
+      // File data was uploaded to SFTP via /api/dealer-request — no file relay needed here
+      const pendingFflFileName = null;
+      const pendingFflFileData = null;
+      const pendingSotFileName = null;
+      const pendingSotFileData = null;
 
       // Call /api/retail-order with the same shape as the public order form,
       // so the dealer order gets a DB record AND automatic emails sent

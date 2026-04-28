@@ -70,6 +70,8 @@ type Submission = {
   form3PdfData?: string;
   trackingNumber?: string;
   shippedAt?: string;
+  paidAt?: string;
+  paidNotes?: string;
   hasOrderedDemo?: string;
   createdAt: string;
   order_type?: string;
@@ -334,7 +336,7 @@ function fmtDate(d: string | Date) {
 function SubmissionsTab({
   submissions, isLoading, search, setSearch,
   sortDir, setSortDir, sortBy, setSortBy, showArchived, setShowArchived,
-  setArchiveTarget, setShipTarget, setInvoiceTarget, setDeleteTarget,
+  setArchiveTarget, setShipTarget, setInvoiceTarget, setDeleteTarget, setPaidTarget,
   setRequestDocsTarget, setForm3SubmittedTarget,
   onFetchSubmissions
 }: {
@@ -347,6 +349,7 @@ function SubmissionsTab({
   setShipTarget: (s: Submission | null) => void;
   setInvoiceTarget: (s: Submission | null) => void;
   setDeleteTarget: (s: Submission | null) => void;
+  setPaidTarget: (s: Submission | null) => void;
   setRequestDocsTarget: (s: Submission | null) => void;
   setForm3SubmittedTarget: (s: Submission | null) => void;
   onFetchSubmissions: () => void;
@@ -363,10 +366,24 @@ function SubmissionsTab({
     }
     return true;
   }).sort((a, b) => {
-    // Shipped orders (with trackingNumber) sink to the bottom
+    // Three-tier sort: Open → Shipped → Paid
+    const aPaid = !!a.paidAt;
+    const bPaid = !!b.paidAt;
+    if (aPaid !== bPaid) return aPaid ? 1 : -1;
+
     const aShipped = !!a.trackingNumber;
     const bShipped = !!b.trackingNumber;
     if (aShipped !== bShipped) return aShipped ? 1 : -1;
+
+    // Within paid: newest first
+    if (aPaid && bPaid) {
+      return new Date(b.paidAt!).getTime() - new Date(a.paidAt!).getTime();
+    }
+
+    // Within shipped: newest shipped first
+    if (aShipped && bShipped) {
+      return new Date(b.shippedAt!).getTime() - new Date(a.shippedAt!).getTime();
+    }
 
     const t = sortDir === "desc" ? -1 : 1;
     if (sortBy === "quantity") {
@@ -415,7 +432,8 @@ function SubmissionsTab({
             onArchive={() => setArchiveTarget(sub)}
             onDelete={() => { console.log("delete card clicked", sub.id); setDeleteTarget(sub); }}
             onShip={() => setShipTarget(sub)}
-            onInvoice={() => setInvoiceTarget(sub)} />)}
+            onInvoice={() => setInvoiceTarget(sub)}
+            onPaid={() => setPaidTarget(sub)} />)}
       </div>
 
       {/* Desktop table */}
@@ -441,7 +459,8 @@ function SubmissionsTab({
                 onShip={() => setShipTarget(sub)}
                 onInvoice={() => setInvoiceTarget(sub)}
                 onRequestDocs={() => setRequestDocsTarget(sub)}
-                onForm3Submitted={() => setForm3SubmittedTarget(sub)} />)}
+                onForm3Submitted={() => setForm3SubmittedTarget(sub)}
+                onPaid={() => setPaidTarget(sub)} />)}
           </tbody>
         </table>
       </div>
@@ -449,7 +468,7 @@ function SubmissionsTab({
   );
 }
 
-function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: Submission; onArchive: () => void; onDelete: () => void; onShip: () => void; onInvoice: () => void }) {
+function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice, onPaid }: { sub: Submission; onArchive: () => void; onDelete: () => void; onShip: () => void; onInvoice: () => void; onPaid: () => void }) {
   return (
     <div className={`border border-border rounded-lg p-3 bg-card hover:bg-secondary/5 ${sub.archived ? "opacity-60 bg-secondary/5" : ""}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -512,13 +531,24 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
           <DocBadge type="state_tax" fileName={sub.stateTaxFileName} fileData={sub.stateTaxFileData} orDealerFileData={sub.dealerStateTaxFileName} submissionId={sub.id} fflLicenseNumber={sub.fflLicenseNumber} createdAt={sub.createdAt} />
         </div>
       </div>
-      {/* Shipping */}
-      <div className="border-t border-border pt-2 mt-2">
+      {/* Shipping / Paid */}
+      <div className="border-t border-border pt-2 mt-2 space-y-1">
         {sub.trackingNumber ? (
           <div className="space-y-1">
             <span className="px-1.5 py-0.5 bg-green-600 text-white text-xs rounded font-bold">SHIPPED</span>
             <p className="text-xs font-mono text-foreground">{sub.trackingNumber}</p>
             {sub.shippedAt && <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), "MM/dd/yy HH:mm")}</p>}
+            {sub.paidAt && (
+              <div className="mt-1">
+                <span className="px-1.5 py-0.5 bg-emerald-600 text-white text-xs rounded font-bold">PAID</span>
+                {sub.paidNotes && <p className="text-xs text-muted-foreground mt-0.5 italic">"{sub.paidNotes}"</p>}
+              </div>
+            )}
+            {!sub.paidAt && (
+              <Button variant="outline" size="sm" className="w-full h-7 text-xs border-emerald-600 text-emerald-600 hover:bg-emerald-50" onClick={onPaid}>
+                Mark Paid
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-1">
@@ -548,7 +578,7 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice }: { sub: 
   );
 }
 
-function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestDocs, onForm3Submitted }: { sub: Submission; onArchive: () => void; onDelete: () => void; onShip: () => void; onInvoice: () => void; onRequestDocs: () => void; onForm3Submitted?: () => void }) {
+function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestDocs, onForm3Submitted, onPaid }: { sub: Submission; onArchive: () => void; onDelete: () => void; onShip: () => void; onInvoice: () => void; onRequestDocs: () => void; onForm3Submitted?: () => void; onPaid: () => void }) {
   return (
     <tr className={`border-b border-border hover:bg-secondary/10 ${sub.archived ? "opacity-50" : ""}`}>
       <td className="px-3 py-3 whitespace-nowrap text-muted-foreground text-xs font-mono">{fmtDate(sub.createdAt)}</td>
@@ -598,6 +628,17 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestD
             <span className="px-1.5 py-0.5 bg-green-600 text-white text-xs rounded font-bold">SHIPPED</span>
             <p className="text-xs font-mono text-foreground">{sub.trackingNumber}</p>
             {sub.shippedAt && <p className="text-xs text-muted-foreground">{format(parseISO(sub.shippedAt), "MM/dd/yy HH:mm")}</p>}
+            {sub.paidAt && (
+              <div className="mt-1">
+                <span className="px-1.5 py-0.5 bg-emerald-600 text-white text-xs rounded font-bold">PAID</span>
+                {sub.paidNotes && <p className="text-xs text-muted-foreground mt-0.5 italic">"{sub.paidNotes}"</p>}
+              </div>
+            )}
+            {!sub.paidAt && (
+              <Button variant="outline" size="sm" className="h-7 text-xs whitespace-nowrap border-emerald-600 text-emerald-600 hover:bg-emerald-50" onClick={onPaid}>
+                Mark Paid
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-1">
@@ -2002,6 +2043,65 @@ function ShipDialog({ sub, open, onClose }: {
   );
 }
 
+// ── Paid Dialog ────────────────────────────────────────────────────────────────
+
+function PaidDialog({ sub, open, onClose, onPaid }: {
+  sub: Submission | null; open: boolean; onClose: () => void; onPaid: () => void;
+}) {
+  const { toast } = useToast();
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (!open) setNotes(""); }, [open]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/submissions/${sub?.id}/paid`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paidNotes: notes }),
+      });
+      if (!res.ok) throw new Error("Failed to mark as paid");
+      toast({ title: "Marked as Paid", description: notes ? `Note saved: "${notes}"` : "No note added." });
+      onPaid();
+      onClose();
+    } catch {
+      toast({ title: "Error", description: "Could not mark as paid.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="bg-card border-border sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Mark Order as Paid</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Add an optional note about the payment (e.g., "Check #1234", "Venmo", "Paid in full").
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-3">
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Check #1234, Venmo, Paid in full..."
+            rows={3}
+            className="bg-background border-border resize-none"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} className="border-border">Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            {saving ? "Saving..." : "Mark as Paid"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 // ── Warranty Tab ───────────────────────────────────────────────────────────────
 
@@ -3031,6 +3131,7 @@ export default function AdminPage() {
   const [requestDocsTarget, setRequestDocsTarget] = useState<Submission | null>(null);
   const [requestDocsSaving, setRequestDocsSaving] = useState(false);
   const [form3SubmittedTarget, setForm3SubmittedTarget] = useState<Submission | null>(null);
+  const [paidTarget, setPaidTarget] = useState<Submission | null>(null);
   const [form3SubmittedSaving, setForm3SubmittedSaving] = useState(false);
   const [warrantyRequests, setWarrantyRequests] = useState<any[]>([]);
   const [warrantySearch, setWarrantySearch] = useState("");
@@ -3388,6 +3489,7 @@ export default function AdminPage() {
                 setDeleteTarget={setDeleteTarget}
                 setRequestDocsTarget={setRequestDocsTarget}
                 setForm3SubmittedTarget={setForm3SubmittedTarget}
+                setPaidTarget={setPaidTarget}
                 onFetchSubmissions={fetchSubmissions}
               />
             </CardContent>
@@ -3569,6 +3671,7 @@ export default function AdminPage() {
       </AlertDialog>
 
       <ShipDialog sub={shipTarget} open={!!shipTarget} onClose={() => setShipTarget(null)} />
+      <PaidDialog sub={paidTarget} open={!!paidTarget} onClose={() => setPaidTarget(null)} onPaid={fetchSubmissions} />
       <InvoiceDialog sub={invoiceTarget} open={!!invoiceTarget} onClose={() => setInvoiceTarget(null)} />
 
       <Dialog open={!!requestDocsTarget} onOpenChange={(o) => { if (!o) setRequestDocsTarget(null); }}>

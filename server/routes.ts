@@ -782,7 +782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { paidNotes } = req.body || {};
       await pool.query(
-        `UPDATE submissions SET paid_at = NOW()::text, paid_notes = $1 WHERE id = $2`,
+        `UPDATE submissions SET paid_at = NOW(), paid_notes = $1 WHERE id = $2`,
         [paidNotes || null, id]
       );
       return res.json({ ok: true });
