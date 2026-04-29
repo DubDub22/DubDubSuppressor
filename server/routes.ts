@@ -332,14 +332,36 @@ export async function sendViaGmail({
   return resp.json();
 }
 
-// Load multi-state tax form PDF as base64 for auto-reply attachments
-const MULTI_STATE_TAX_FORM_PATH = path.join(__dirname, "..", "shared", "multi_state_tax_form.pdf");
-let multiStateTaxFormBase64: string | null = null;
-try {
-  multiStateTaxFormBase64 = fs.readFileSync(MULTI_STATE_TAX_FORM_PATH, "base64");
-} catch {
-  console.warn("multi_state_tax_form.pdf not found - tax form attachment will be skipped");
-}
+  // Load multi-state tax form PDF as base64 for auto-reply attachments
+  const MULTI_STATE_TAX_FORM_PATH = path.join(__dirname, "..", "shared", "multi_state_tax_form.pdf");
+  let multiStateTaxFormBase64: string | null = null;
+  try {
+    multiStateTaxFormBase64 = fs.readFileSync(MULTI_STATE_TAX_FORM_PATH, "base64");
+  } catch {
+    console.warn("multi_state_tax_form.pdf not found - tax form attachment will be skipped");
+  }
+
+  // Generate filled tax form PDF
+  app.post("/api/admin/tax-form/generate", requireAdmin, async (req, res) => {
+    try {
+      const { businessName, ein, address, city, state, zip } = req.body || {};
+
+      // For now, return the original PDF with a note
+      // In production, use a PDF library to fill form fields
+      if (!multiStateTaxFormBase64) {
+        return res.status(404).json({ ok: false, error: "Tax form template not found" });
+      }
+
+      // TODO: Use pdf-lib to fill form fields
+      // For now, return the original PDF
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="tax_form_${businessName || "dealer"}.pdf"`);
+      fs.createReadStream(MULTI_STATE_TAX_FORM_PATH).pipe(res);
+    } catch (err: any) {
+      console.error("tax_form_generate_error", err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Load FFL master list

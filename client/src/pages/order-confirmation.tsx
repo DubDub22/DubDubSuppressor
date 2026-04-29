@@ -113,9 +113,17 @@ export default function OrderConfirmationPage() {
     window.location.href = "/order";
   }
 
-  const stepsComplete = accepted && signatureName.trim();
+  const stepsComplete = accepted && signatureName.trim() && taxFormDone;
   const step1Done = accepted;
   const step2Done = !!signatureName.trim();
+  const [taxFormDone, setTaxFormDone] = useState(false);
+  const [taxBusinessName, setTaxBusinessName] = useState(dealerName);
+  const [taxAddress, setTaxAddress] = useState(customerAddress);
+  const [taxCity, setTaxCity] = useState(customerCity);
+  const [taxState, setTaxState] = useState(customerState);
+  const [taxZip, setTaxZip] = useState(customerZip);
+  const [taxEin, setTaxEin] = useState("");
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -237,7 +245,117 @@ export default function OrderConfirmationPage() {
           </div>
         </motion.div>
 
-        {/* Terms and Conditions */}
+        {/* Tax Form Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-card rounded-lg border border-border p-6 mb-6"
+      >
+        <h2 className="text-lg font-semibold mb-4">Multi-State Tax Affidavit</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Fill out the tax form below. It will be generated as a PDF and attached to your dealer record.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-4">
+          <div>
+            <label htmlFor="taxBusinessName" className="text-muted-foreground block mb-1">Business Name</label>
+            <input
+              id="taxBusinessName"
+              type="text"
+              value={taxBusinessName}
+              onChange={(e) => setTaxBusinessName(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-foreground"
+            />
+          </div>
+          <div>
+            <label htmlFor="taxEin" className="text-muted-foreground block mb-1">EIN</label>
+            <input
+              id="taxEin"
+              type="text"
+              value={taxEin}
+              onChange={(e) => setTaxEin(e.target.value)}
+              placeholder="XX-XXXXXXX"
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-foreground"
+            />
+          </div>
+          <div>
+            <label htmlFor="taxAddress" className="text-muted-foreground block mb-1">Address</label>
+            <input
+              id="taxAddress"
+              type="text"
+              value={taxAddress}
+              onChange={(e) => setTaxAddress(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-foreground"
+            />
+          </div>
+          <div>
+            <label htmlFor="taxCity" className="text-muted-foreground block mb-1">City</label>
+            <input
+              id="taxCity"
+              type="text"
+              value={taxCity}
+              onChange={(e) => setTaxCity(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-foreground"
+            />
+          </div>
+          <div>
+            <label htmlFor="taxState" className="text-muted-foreground block mb-1">State</label>
+            <input
+              id="taxState"
+              type="text"
+              value={taxState}
+              onChange={(e) => setTaxState(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-foreground"
+            />
+          </div>
+          <div>
+            <label htmlFor="taxZip" className="text-muted-foreground block mb-1">Zip Code</label>
+            <input
+              id="taxZip"
+              type="text"
+              value={taxZip}
+              onChange={(e) => setTaxZip(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-foreground"
+            />
+          </div>
+        </div>
+        <Button
+          onClick={async () => {
+            setGeneratingPdf(true);
+            try {
+              const res = await fetch("/api/admin/tax-form/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  businessName: taxBusinessName,
+                  ein: taxEin,
+                  address: taxAddress,
+                  city: taxCity,
+                  state: taxState,
+                  zip: taxZip,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || "Failed to generate PDF");
+              // Download the PDF
+              const link = document.createElement("a");
+              link.href = data.pdfUrl;
+              link.download = `tax_form_${taxBusinessName}.pdf`;
+              link.click();
+              setTaxFormDone(true);
+              toast({ title: "Success", description: "Tax form PDF generated and downloaded." });
+            } catch (err: any) {
+              toast({ title: "Error", description: err.message, variant: "destructive" });
+            } finally {
+              setGeneratingPdf(false);
+            }
+          }}
+          disabled={!taxBusinessName || !taxEin || generatingPdf}
+          className="bg-blue-600 text-white hover:bg-blue-700"
+        >
+          {generatingPdf ? "Generating PDF..." : "Generate & Download Tax Form PDF"}
+        </Button>
+      </motion.div>
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
