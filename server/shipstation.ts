@@ -77,10 +77,10 @@ export type CreateLabelResult = {
 // ── API Methods ───────────────────────────────────────────────────────────
 
 const SHIP_FROM = {
-  companyName: "Double T Tactical / DubDub22",
-  name: "Tom Flores",
-  phone: "210-XXX-XXXX", // update with real phone
-  addressLine1: "Floresville, TX", // update with real address
+  companyName: "Double T Tactical",
+  name: "Thomas Trevino",
+  phone: "469-307-8001",
+  addressLine1: "105 Bear Trce",
   city: "Floresville",
   state: "TX",
   postalCode: "78114",

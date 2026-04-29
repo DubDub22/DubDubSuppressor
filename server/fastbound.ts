@@ -159,24 +159,6 @@ export async function createPendingDisposition(
     }),
   });
 
-  const dispositionId = disp.id;
-  if (!dispositionId) throw new Error("No disposition ID returned from FastBound");
-
-  // 2. Attach dealer contact
-  await fbFetch(`/dispositions/${dispositionId}/contact`, {
-    method: "POST",
-    body: JSON.stringify({
-      name: dealer.name,
-      addressLine1: dealer.addressLine1,
-      city: dealer.city,
-      state: dealer.state,
-      postalCode: dealer.postalCode,
-      email: dealer.email,
-      phone: dealer.phone,
-      fflNumber: dealer.fflNumber,
-    }),
-  });
-
   // 4. Add items (serials) one by one
   for (const item of items) {
     await fbFetch(`/dispositions/${dispositionId}/items`, {
