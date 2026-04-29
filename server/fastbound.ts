@@ -62,21 +62,23 @@ export type FastBoundContact = {
   // FastBound FFL contact required fields
   fflNumber: string;
   fflExpires?: string; // YYYY-MM-DD
-  licenseName: string; // business name on FFL
+  licenseName?: string; // "TREVINO, THOMAS" (auto-populated by FastBound from FFL DB)
+  tradeName?: string; // "DOUBLE T TACTICAL" (auto-populated by FastBound)
+  // Premise address (required for all contact types)
   premiseAddress1: string;
   premiseCity: string;
   premiseState: string;
   premiseZipCode: string;
   premiseCountry?: string; // default "US"
-  // SOT info
-  sotLicenseType?: string; // "1 - Importer", "2 - Manufacturer", "3 - Dealer" (EIN Type)
-  // Contact name (split for FFL contacts — FastBound doesn't allow contactName for FFL)
-  firstName?: string;
-  lastName?: string;
-  // Optional
+  // Optional (NOT auto-populated by FastBound for FFL contacts)
   phone?: string;
-  ein?: string; // EIN from order form
-  email?: string; // stored in notes (FastBound contacts don't have email field)
+  ein?: string; // EIN (not auto-populated)
+  einType?: string; // "1 - Importer", "2 - Manufacturer", "3 - Dealer" (not auto-populated)
+  email?: string; // stored in notes (FastBound FFL contacts don't have email field)
+  // These are REJECTED for FFL contact type — do NOT send
+  // firstName?: string;
+  // lastName?: string;
+  // organizationName?: string;
 };
 
 export type CreateDispositionResult = {
@@ -100,39 +102,23 @@ export async function createOrUpdateContact(
   }
 
   // Create new FFL contact
-  // Parse licenseName "LAST, FIRST" → firstName, lastName
-  // Also handle contactName as fallback
-  let firstName = "", lastName = "";
-  if (dealer.licenseName && dealer.licenseName.includes(",")) {
-    // Format: "TREVINO, THOMAS" → lastName="TREVINO", firstName="THOMAS"
-    const parts = dealer.licenseName.split(",").map(s => s.trim());
-    lastName = parts[0] || "";
-    firstName = parts[1] || "";
-  } else if (dealer.contactName) {
-    const nameParts = dealer.contactName.split(" ");
-    firstName = nameParts[0] || "";
-    lastName = nameParts.slice(1).join(" ") || "";
-  }
+  // NOTE: Do NOT send firstName, lastName, or organizationName for FFL contacts
+  // FastBound rejects them — use licenseName for business name
 
   const contact: any = {
     fflNumber: dealer.fflNumber,
-    // FastBound auto-populates licenseName, premise address from FFL database
-    // but we send them anyway to ensure consistency
     licenseName: dealer.licenseName || undefined,
     fflExpires: dealer.fflExpires || undefined,
+    tradeName: dealer.tradeName || undefined,
     premiseAddress1: dealer.premiseAddress1,
     premiseCity: dealer.premiseCity,
     premiseState: dealer.premiseState,
     premiseZipCode: dealer.premiseZipCode,
     premiseCountry: dealer.premiseCountry || "US",
-    phone: dealer.phone,
-    // These are NOT auto-populated by FastBound — must send explicitly
-    firstName: firstName || undefined,
-    lastName: lastName || undefined,
-    // EIN (FastBound stores as separate field on contact)
+    phone: dealer.phone || undefined,
+    // EIN (not auto-populated by FastBound for FFL contacts)
     ein: dealer.ein || undefined,
-    // SOT License Type maps to FastBound's EIN Type field
-    // Values: "1 - Importer", "2 - Manufacturer", "3 - Dealer"
+    // EIN Type maps from sotLicenseType ("1 - Importer", etc.)
     ...(dealer.einType ? { einType: dealer.einType } : {}),
     // Email stored in notes (FastBound FFL contacts don't have email field)
     ...(dealer.email ? { notes: `Email: ${dealer.email}` } : {}),
