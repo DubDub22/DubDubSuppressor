@@ -337,10 +337,10 @@ export default function OrderConfirmationPage() {
               });
               const data = await res.json();
               if (!res.ok) throw new Error(data.error || "Failed to generate PDF");
-              // Download the PDF
+              // Download base64 PDF
               const link = document.createElement("a");
-              link.href = data.pdfUrl;
-              link.download = `tax_form_${taxBusinessName}.pdf`;
+              link.href = `data:application/pdf;base64,${data.pdfBase64}`;
+              link.download = data.filename || `tax_form_${taxBusinessName}.pdf`;
               link.click();
               setTaxFormDone(true);
               toast({ title: "Success", description: "Tax form PDF generated and downloaded." });

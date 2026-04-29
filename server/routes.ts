@@ -345,18 +345,80 @@ export async function sendViaGmail({
   app.post("/api/admin/tax-form/generate", requireAdmin, async (req, res) => {
     try {
       const { businessName, ein, address, city, state, zip } = req.body || {};
-
-      // For now, return the original PDF with a note
-      // In production, use a PDF library to fill form fields
-      if (!multiStateTaxFormBase64) {
-        return res.status(404).json({ ok: false, error: "Tax form template not found" });
+      if (!businessName || !ein) {
+        return res.status(400).json({ ok: false, error: "Business Name and EIN required" });
       }
 
-      // TODO: Use pdf-lib to fill form fields
-      // For now, return the original PDF
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="tax_form_${businessName || "dealer"}.pdf"`);
-      fs.createReadStream(MULTI_STATE_TAX_FORM_PATH).pipe(res);
+      // Dynamic import pdf-lib (requires: npm install pdf-lib)
+      const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+
+      // Create a new PDF
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([612, 792]); // US Letter
+      const { height } = page.getSize();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      let y = height - 50;
+      const leftX = 50;
+      const lineHeight = 25;
+
+      // Title
+      page.drawText("MULTI-STATE TAX AFFIDAVIT", {
+        x: leftX, y, size: 18, font: boldFont, color: rgb(0, 0, 0),
+      });
+      y -= 40;
+
+      // Business Name
+      page.drawText("Business Name:", { x: leftX, y, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+      page.drawText(businessName, { x: leftX + 120, y, size: 12, font, color: rgb(0, 0, 0) });
+      y -= lineHeight;
+
+      // EIN
+      page.drawText("EIN:", { x: leftX, y, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+      page.drawText(ein, { x: leftX + 50, y, size: 12, font, color: rgb(0, 0, 0) });
+      y -= lineHeight;
+
+      // Address
+      page.drawText("Address:", { x: leftX, y, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+      page.drawText(address || "", { x: leftX + 80, y, size: 12, font, color: rgb(0, 0, 0) });
+      y -= lineHeight;
+
+      // City, State, Zip
+      page.drawText("City:", { x: leftX, y, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+      page.drawText(city || "", { x: leftX + 50, y, size: 12, font, color: rgb(0, 0, 0) });
+      page.drawText("State:", { x: leftX + 200, y, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+      page.drawText(state || "", { x: leftX + 250, y, size: 12, font, color: rgb(0, 0, 0) });
+      page.drawText("Zip:", { x: leftX + 320, y, size: 12, font: boldFont, color: rgb(0, 0, 0) });
+      page.drawText(zip || "", { x: leftX + 355, y, size: 12, font, color: rgb(0, 0, 0) });
+      y -= lineHeight * 2;
+
+      // Declaration
+      const declaration = [
+        "I hereby certify that the above-named business is exempt from sales tax in the",
+        "states listed above, and that this exemption applies to the purchase of NFA items.",
+        "",
+        "This form is provided for dealer convenience and must be kept on file for",
+        "audit purposes.",
+      ];
+      for (const line of declaration) {
+        page.drawText(line, { x: leftX, y, size: 10, font, color: rgb(0, 0, 0) });
+        y -= 18;
+      }
+
+      y -= 20;
+      page.drawText(`Generated: ${new Date().toLocaleDateString()}`, {
+        x: leftX, y, size: 10, font, color: rgb(0.5, 0.5, 0.5),
+      });
+
+      const pdfBytes = await pdfDoc.save();
+      const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
+
+      return res.json({
+        ok: true,
+        pdfBase64,
+        filename: `tax_form_${businessName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
+      });
     } catch (err: any) {
       console.error("tax_form_generate_error", err);
       return res.status(500).json({ ok: false, error: err.message });
