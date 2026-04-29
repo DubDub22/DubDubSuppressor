@@ -1052,8 +1052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
            d.sot_expiry_date, d.ffl_expiry_date,
            d.tax_exempt, d.notes,
            d.has_demo_unit_shipped,
-           d.source,
-           d.created_at,
+           d.source,\r\n           d.state_tax_id,\r\n           d.created_at,
            (d.ffl_file_name IS NOT NULL AND d.ffl_file_name != '') AS has_ffl_on_file,
            (d.sot_file_name IS NOT NULL AND d.sot_file_name != '') AS has_sot_on_file,
            (d.sales_tax_form_name IS NOT NULL AND d.sales_tax_form_name != '') AS has_tax_form_on_file

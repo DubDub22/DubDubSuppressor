@@ -20,55 +20,74 @@ export default function TaxFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [taxFormOnFile, setTaxFormOnFile] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Dealer info (auto-filled from API)
+  const [dealerName, setDealerName] = useState("");
+  const [dealerContact, setDealerContact] = useState("");
+  const [dealerEmail, setDealerEmail] = useState("");
+  const [dealerPhone, setDealerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [customerCity, setCustomerCity] = useState("");
+  const [customerState, setCustomerState] = useState("");
+  const [customerZip, setCustomerZip] = useState("");
   const [stateTaxId, setStateTaxId] = useState("");
+
   const [resaleCertFile, setResaleCertFile] = useState<File | null>(null);
   const [resaleCertDataUrl, setResaleCertDataUrl] = useState("");
 
   const orderType = searchParams.get("type") || "demo";
   const quantity = searchParams.get("qty") || "1";
-  const dealerName = searchParams.get("dealer") || "Registered Dealer";
-  const dealerContact = searchParams.get("contact") || dealerName;
-  const dealerEmail = searchParams.get("email") || "";
-  const dealerPhone = searchParams.get("phone") || "";
-  const customerAddress = searchParams.get("address") || "";
-  const customerCity = searchParams.get("city") || "";
-  const customerState = searchParams.get("state") || "";
-  const customerZip = searchParams.get("zip") || "";
   const ffl = searchParams.get("ffl") || "";
 
-  // Check if tax form is already on file
+  // Fetch dealer profile and auto-fill ALL fields
   useEffect(() => {
     if (!ffl) {
       setTaxFormOnFile(false);
       setLoading(false);
       return;
     }
+
     fetch(`/api/dealer/profile?ffl=${encodeURIComponent(ffl)}`)
       .then(r => r.json())
       .then(data => {
-        if (data.ok && data.data?.taxFormOnFile) {
+        if (!data.ok || !data.data) {
+          setTaxFormOnFile(false);
+          setLoading(false);
+          return;
+        }
+
+        const d = data.data;
+
+        // Auto-fill ALL dealer info from database (read-only)
+        setDealerName(d.businessName || "");
+        setDealerContact(d.contactName || "");
+        setDealerEmail(d.email || "");
+        setDealerPhone(d.phone || "");
+        setCustomerAddress(d.address || "");
+        setCustomerCity(d.city || "");
+        setCustomerState(d.state || "");
+        setCustomerZip(d.zip || "");
+        setStateTaxId(d.stateTaxId || "");
+
+        // Check if tax form already on file
+        if (d.hasTaxFormOnFile) {
           setTaxFormOnFile(true);
           // Skip tax form page, go directly to order confirmation
           const params = new URLSearchParams({
             type: orderType,
             qty: quantity,
-            dealer: dealerName,
-            contact: dealerContact,
-            email: dealerEmail,
-            phone: dealerPhone,
-            address: customerAddress,
-            city: customerCity,
-            state: customerState,
-            zip: customerZip,
             ffl: ffl,
           });
           window.location.href = `/order-confirmation?${params.toString()}`;
         } else {
           setTaxFormOnFile(false);
+          setLoading(false);
         }
       })
-      .catch(() => setTaxFormOnFile(false))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        setTaxFormOnFile(false);
+        setLoading(false);
+      });
   }, [ffl]);
 
   // Canvas setup for signature
@@ -187,7 +206,7 @@ export default function TaxFormPage() {
       page.drawText("Resale Certificate", { x: 50, y: 700, size: 14, font, color: rgb(0, 0, 0) });
       page.drawText(`State: ${customerState}`, { x: 400, y: 720, size: 12, font, color: rgb(0, 0, 0) });
 
-      // Dealer info
+      // Dealer info (auto-filled, read-only)
       page.drawText(`Dealer: ${dealerName}`, { x: 50, y: 650, size: 12, font, color: rgb(0, 0, 0) });
       page.drawText(`Contact: ${dealerContact}`, { x: 50, y: 635, size: 12, font, color: rgb(0, 0, 0) });
       page.drawText(`Email: ${dealerEmail}`, { x: 50, y: 620, size: 12, font, color: rgb(0, 0, 0) });
@@ -245,14 +264,6 @@ export default function TaxFormPage() {
       const params = new URLSearchParams({
         type: orderType,
         qty: quantity,
-        dealer: dealerName,
-        contact: dealerContact,
-        email: dealerEmail,
-        phone: dealerPhone,
-        address: customerAddress,
-        city: customerCity,
-        state: customerState,
-        zip: customerZip,
         ffl: ffl,
       });
       window.location.href = `/order-confirmation?${params.toString()}`;
@@ -298,7 +309,7 @@ export default function TaxFormPage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Tax Form Content */}
+              {/* Tax Form Content (Auto-filled, Read-only) */}
               <div className="bg-secondary/10 p-6 rounded-lg space-y-4">
                 <h3 className="font-bold text-lg">Resale Certificate</h3>
                 <p className="text-sm text-muted-foreground">
@@ -310,70 +321,70 @@ export default function TaxFormPage() {
                 <Separator className="bg-border" />
 
                 <div className="space-y-2">
-                  <p className="text-sm"><strong>Dealer:</strong> {dealerName}</p>
-                  <p className="text-sm"><strong>Contact:</strong> {dealerContact}</p>
-                  <p className="text-sm"><strong>Email:</strong> {dealerEmail}</p>
-                  <p className="text-sm"><strong>Phone:</strong> {dealerPhone}</p>
+                  <p className="text-sm"><strong>Dealer:</strong> <span className="text-muted-foreground">{dealerName}</span></p>
+                  <p className="text-sm"><strong>Contact:</strong> <span className="text-muted-foreground">{dealerContact}</span></p>
+                  <p className="text-sm"><strong>Email:</strong> <span className="text-muted-foreground">{dealerEmail}</span></p>
+                  <p className="text-sm"><strong>Phone:</strong> <span className="text-muted-foreground">{dealerPhone}</span></p>
                   <p className="text-sm">
-                    <strong>Address:</strong> {customerAddress}, {customerCity}, {customerState} {customerZip}
+                    <strong>Address:</strong> <span className="text-muted-foreground">{customerAddress}, {customerCity}, {customerState} {customerZip}</span>
                   </p>
                 </div>
+              </div>
 
-                {/* State Tax ID */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    State Tax ID Number ({customerState})
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder={`Enter ${customerState} Tax ID...`}
-                    value={stateTaxId}
-                    onChange={(e) => setStateTaxId(e.target.value)}
-                    className="bg-background"
+              {/* State Tax ID (Editable) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  State Tax ID Number ({customerState})
+                </label>
+                <Input
+                  type="text"
+                  placeholder={`Enter ${customerState} Tax ID...`}
+                  value={stateTaxId}
+                  onChange={(e) => setStateTaxId(e.target.value)}
+                  className="bg-background"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter your state-issued resale certificate number (not EIN)
+                </p>
+              </div>
+
+              {/* State Resale Certificate Upload (Optional) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  State-Issued Resale Certificate (Optional)
+                </label>
+                <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                  onClick={() => document.getElementById("resaleCertInput")?.click()}>
+                  <input
+                    id="resaleCertInput"
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setResaleCertFile(file);
+                        const reader = new FileReader();
+                        reader.onloadend = () => setResaleCertDataUrl(reader.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Enter your state-issued resale certificate number (not EIN)
-                  </p>
-                </div>
-
-                {/* State Resale Certificate Upload */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    State-Issued Resale Certificate (Optional)
-                  </label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                    onClick={() => document.getElementById("resaleCertInput")?.click()}>
-                    <input
-                      id="resaleCertInput"
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setResaleCertFile(file);
-                          const reader = new FileReader();
-                          reader.onloadend = () => setResaleCertDataUrl(reader.result as string);
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                    {resaleCertFile ? (
-                      <div className="space-y-1">
-                        <p className="text-sm text-green-600 font-medium">{resaleCertFile.name}</p>
-                        <p className="text-xs text-muted-foreground">Click to change</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <Upload className="w-6 h-6 mx-auto text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          Upload your state-issued resale certificate
-                        </p>
-                        <p className="text-xs text-muted-foreground">PDF, PNG, JPG accepted</p>
-                      </div>
-                    )}
-                  </div>
+                  {resaleCertFile ? (
+                    <div className="space-y-1">
+                      <p className="text-sm text-green-600 font-medium">{resaleCertFile.name}</p>
+                      <p className="text-xs text-muted-foreground">Click to change</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Upload className="w-6 h-6 mx-auto text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Upload your state-issued resale certificate
+                      </p>
+                      <p className="text-xs text-muted-foreground">PDF, PNG, JPG accepted</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -416,7 +427,7 @@ export default function TaxFormPage() {
               {/* Submit */}
               <Button
                 onClick={handleSubmit}
-                disabled={submitting || !hasSignature}
+                disabled={submitting || !hasSignature || !stateTaxId.trim()}
                 className="w-full font-display text-lg bg-primary text-primary-foreground hover:bg-primary/90 h-12"
               >
                 {submitting ? (
