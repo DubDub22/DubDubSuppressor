@@ -103,13 +103,14 @@ export async function createOrUpdateContact(
 
   // Create new FFL contact
   // NOTE: Do NOT send firstName, lastName, or organizationName for FFL contacts
-  // FastBound rejects them — use licenseName for business name
+  // FastBound rejects them — use licenseName for "LAST, FIRST" format (auto-populated)
 
   const contact: any = {
     fflNumber: dealer.fflNumber,
-    licenseName: dealer.licenseName || undefined,
+    licenseName: dealer.licenseName || undefined, // "TREVINO, THOMAS" (auto-populated by FastBound)
     fflExpires: dealer.fflExpires || undefined,
-    tradeName: dealer.tradeName || undefined,
+    tradeName: dealer.tradeName || undefined, // "DOUBLE T TACTICAL" (auto-populated)
+    businessType: dealer.businessType || undefined, // "Sole Proprietor", "LLC", etc.
     premiseAddress1: dealer.premiseAddress1,
     premiseCity: dealer.premiseCity,
     premiseState: dealer.premiseState,
@@ -123,6 +124,10 @@ export async function createOrUpdateContact(
     // Email stored in notes (FastBound FFL contacts don't have email field)
     ...(dealer.email ? { notes: `Email: ${dealer.email}` } : {}),
   };
+
+  // For Sole Proprietor: FastBound auto-populates licenseName as "LAST, FIRST"
+  // For LLC: licenseName will be the LLC name, tradeName may be empty
+  // We send both to ensure FastBound has the data (it will use auto-populated values if present)
 
   const res: any = await fbFetch("/contacts", {
     method: "POST",
