@@ -563,7 +563,7 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
     }
   }
 
-  // Auto-fill from dealer profile when returning
+  // Auto-fill from dealer profile API after FFL verification
   React.useEffect(() => {
     if (!props.fflNumber) return;
     fetch(`/api/dealer/profile?ffl=${encodeURIComponent(props.fflNumber)}`)
@@ -571,20 +571,22 @@ function DealerForm(props: { fflNumber: string; dealerName?: string; email?: str
       .then(data => {
         if (!data.ok || !data.data) return;
         const d = data.data;
+        // Only auto-fill empty fields to avoid overwriting user edits
+        const current = form.getValues();
         form.reset({
-          ...form.getValues(),
-          dealerName: form.getValues("dealerName") || d.businessName || "",
-          contactName: form.getValues("contactName") || d.contactName || "",
-          email: form.getValues("email") || d.email || "",
-          confirmEmail: form.getValues("confirmEmail") || d.email || "",
-          contactPhone: form.getValues("contactPhone") || d.phone || "",
-          address: form.getValues("address") || d.address || "",
-          city: form.getValues("city") || d.city || "",
-          state: form.getValues("state") || d.state || "",
-          zipCode: form.getValues("zipCode") || d.zip || "",
-          ein: form.getValues("ein") || d.ein || "",
-          einType: form.getValues("einType") || d.einType || "",
-          fflExpiry: form.getValues("fflExpiry") || d.fflExpiryDate || "",
+          dealerName: current.dealerName || d.businessName || props.dealerName || "",
+          contactName: current.contactName || d.contactName || "",
+          email: current.email || d.email || props.email || "",
+          confirmEmail: current.confirmEmail || d.email || props.email || "",
+          contactPhone: current.contactPhone || d.phone || props.phone || "",
+          address: current.address || d.address || props.address || "",
+          city: current.city || d.city || props.city || "",
+          state: current.state || d.state || props.state || "",
+          zipCode: current.zipCode || d.zip || props.zip || "",
+          ein: current.ein || d.stateTaxId || "",
+          einType: current.einType || "",
+          fflExpiry: current.fflExpiry || "",
+          message: current.message || "",
         });
       })
       .catch(() => {});

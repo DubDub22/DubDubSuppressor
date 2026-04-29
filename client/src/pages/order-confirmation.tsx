@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Loader2 } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { useToast } from "@/hooks/use-toast";
@@ -21,30 +22,49 @@ export default function OrderConfirmationPage() {
   const [searchParams] = useSearchParams();
 
   // Order details passed from the order page / FFL challenge flow
-  const orderType = searchParams.get("type") || "demo"; // "demo" | "stocking"
+  const orderType = searchParams.get("type") || "demo";
   const quantity = parseInt(searchParams.get("qty") || "1", 10);
-  const dealerName = searchParams.get("dealer") || "Registered Dealer";
-  const dealerContact = searchParams.get("contact") || dealerName;
-  const dealerEmail = searchParams.get("email") || "";
-  const dealerPhone = searchParams.get("phone") || "";
-  const customerAddress = searchParams.get("address") || "";
-  const customerCity = searchParams.get("city") || "";
-  const customerState = searchParams.get("state") || "";
-  const customerZip = searchParams.get("zip") || "";
+  const ffl = searchParams.get("ffl") || "";
+  const [dealerData, setDealerData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!ffl) {
+      setError("No FFL number provided. Please return to the previous step.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetch(`/api/dealer/profile?ffl=${encodeURIComponent(ffl)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.ok) throw new Error(data.error || "Failed to load dealer profile");
+        setDealerData(data.data);
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [ffl]);
 
   const [accepted, setAccepted] = useState(false);
   const [signatureName, setSignatureName] = useState("");
-  const [signatureDate] = useState(() => {
-    return new Date().toISOString().split("T")[0];
-  });
+  const [signatureDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [accepting, setAccepting] = useState(false);
 
   const unitCount = orderType === "stocking" ? quantity : 1;
   const subtotal = DEALER_PRICE_PER_UNIT * unitCount;
   const tax = subtotal * TAX_RATE;
   const total = subtotal + tax;
-
   const isStocking = orderType === "stocking";
+
+  const dealerName = dealerData?.businessName || "Registered Dealer";
+  const dealerContact = dealerData?.contactName || dealerName;
+  const dealerEmail = dealerData?.email || "";
+  const dealerPhone = dealerData?.phone || "";
+  const customerAddress = dealerData?.address || "";
+  const customerCity = dealerData?.city || "";
+  const customerState = dealerData?.state || "";
+  const customerZip = dealerData?.zip || "";
 
   async function handleAccept() {
     if (!accepted) {
@@ -124,6 +144,38 @@ export default function OrderConfirmationPage() {
   const [taxEin, setTaxEin] = useState("");
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const stepsComplete = accepted && signatureName.trim() && taxFormDone;
+
+  // Auto-fill tax form from dealer profile
+  useEffect(() => {
+    if (!dealerData) return;
+    setTaxBusinessName(dealerData.businessName || "");
+    setTaxAddress(dealerData.address || "");
+    setTaxCity(dealerData.city || "");
+    setTaxState(dealerData.state || "");
+    setTaxZip(dealerData.zip || "");
+    setTaxEin(dealerData.stateTaxId || "");
+  }, [dealerData]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <SiteHeader variant="home" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <SiteHeader variant="home" />
+        <main className="container mx-auto px-6 py-12 max-w-2xl text-center">
+          <p className="text-destructive mb-4">{error}</p>
+          <Button onClick={() => window.location.href = "/order"} variant="outline">Return to Order Page</Button>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
