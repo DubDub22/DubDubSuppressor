@@ -14,7 +14,7 @@ import { registerWildRoutes } from "./routes/wild.ts";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { sftpRead, fflToFolderName } from "./sftp-upload";
+import { fflToFolderName } from "./sftp-upload";
 import { pool } from "./db";
 import { loadFFLMaster, validateFFL } from "./ffl-master";
 import {
@@ -658,7 +658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stream a document for a submission from 3dprintmanager SFTP
+  // Stream a document for a submission from FastBound contact
   
   // GET /api/admin/submissions/:id — fetch single submission with all fields including customer address
   app.get("/api/admin/submissions/:id", requireAdmin, async (req, res) => {
@@ -829,7 +829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!trackingNumber?.trim()) {
         return res.status(400).json({ ok: false, error: "tracking_number_required" });
       }
-      // Look up full submission to check form3SubmittedAt and for Form 3 PDF SFTP upload
+      // Look up full submission to check form3SubmittedAt and for Form 3 PDF FastBound upload
       const rows = await pool.query(`
         SELECT ds.dealer_id, s.type, s.quantity, s.ffl_license_number, s.business_name,
           s.contact_name, s.customer_address, s.customer_city, s.customer_state, s.customer_zip,
@@ -1901,7 +1901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         [dealerId, subIns.rows[0].id]
       );
 
-      // ── SFTP upload + database flags ────────────────────────────────────────
+      // ── FastBound upload + database flags ──────────────────────────────────
       const hasFfl = !!(fflFileData && fflFileName);
       const hasSot = !!(sotFileData && sotFileName);
       const hasTax = !!(taxFormData && taxFormName);
@@ -2238,7 +2238,7 @@ DubDub22 Minions`;
         ).catch(err => console.error("dealer_submission_link_failed", err));
       }
 
-      // Upload documents to 3dprintmanager via SFTP (non-blocking)
+      // Upload documents to FastBound contact (non-blocking)
       const hasFflFile = !!(fflFileData && fflFileName);
       const hasSotFile = !!(sotFileData && sotFileName);
       const hasTaxFile = !!(taxFormFileData && taxFormFileName);
@@ -2582,7 +2582,7 @@ IMPORTANT — Tax Form Note: Download the PDF before filling it out. Do NOT fill
         // Don't fail the request if linking fails
       }
 
-      // Upload dealer documents to 3dprintmanager via SFTP (non-blocking)
+      // Upload dealer documents to FastBound contact (non-blocking)
       if (!isInfo && fflFileData) {
         // Look up dealer's FFL number for proper folder naming
         const dealerRow = await pool.query(
