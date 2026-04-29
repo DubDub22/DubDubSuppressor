@@ -17,6 +17,11 @@ import { storage } from "./storage";
 import { uploadDealerDocuments, sftpRead, fflToFolderName } from "./sftp-upload";
 import { pool } from "./db";
 import { loadFFLMaster, validateFFL } from "./ffl-master";
+import {
+  createPendingDisposition, commitDisposition,
+  saveDispositionId, getDispositionId,
+} from "./fastbound";
+import { createLabel, saveLabelInfo } from "./shipstation";
 
 const SALES_EMAIL = "info@dubdub22.com";
 const ORDER_EMAIL = "orders@dubdub22.com";
@@ -3771,6 +3776,175 @@ print(pdf_path)
     } catch (err: any) {
       console.error("retail_orders_send_invoice_error", err);
       return res.status(500).json({ ok: false, error: err?.message });
+    }
+  });
+
+  // ── FastBound: Assign serials & create pending disposition ─────────────
+  app.post("/api/admin/submissions/:id/fastbound-pending", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { serialNumbers } = req.body || {};
+      if (!Array.isArray(serialNumbers) || serialNumbers.length === 0) {
+        return res.status(400).json({ ok: false, error: "serialNumbers array required" });
+      }
+
+      // Get submission + dealer info
+      const subResult = await pool.query(
+        `SELECT s.*, d.business_name, d.contact_name, d.email, d.phone,
+                d.business_address, d.city, d.state, d.zip, d.ffl_license_number
+           FROM submissions s
+           LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
+           LEFT JOIN dealers d ON d.id = ds.dealer_id
+          WHERE s.id = $1 LIMIT 1`,
+        [id]
+      );
+      const sub = subResult.rows[0];
+      if (!sub) return res.status(404).json({ ok: false, error: "Submission not found" });
+
+      const dealer = {
+        name: sub.business_name || sub.contact_name || "Unknown Dealer",
+        addressLine1: sub.business_address || sub.customer_address || "",
+        city: sub.city || sub.customer_city || "",
+        state: sub.state || sub.customer_state || "",
+        postalCode: sub.zip || sub.customer_zip || "",
+        email: sub.email || "",
+        phone: sub.phone || "",
+        fflNumber: sub.ffl_license_number || "",
+      };
+
+      const items = serialNumbers.map((sn: string) => ({ serialNumber: String(sn) }));
+      const result = await createPendingDisposition(dealer, items);
+      await saveDispositionId(id, result.id);
+
+      // Update submission with serial numbers
+      await pool.query(
+        `UPDATE submissions SET serial_number = $1 WHERE id = $2`,
+        [serialNumbers.join(","), id]
+      );
+
+      return res.json({ ok: true, dispositionId: result.id });
+    } catch (err: any) {
+      console.error("fastbound_pending_error", err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // ── FastBound: Commit disposition after Form 3 approved ────────────────
+  app.post("/api/admin/submissions/:id/fastbound-commit", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { trackingNumber } = req.body || {};
+      if (!trackingNumber?.trim()) {
+        return res.status(400).json({ ok: false, error: "trackingNumber required" });
+      }
+
+      const dispositionId = await getDispositionId(id);
+      if (!dispositionId) {
+        return res.status(400).json({ ok: false, error: "No pending disposition found. Create one first." });
+      }
+
+      await commitDisposition(dispositionId, trackingNumber.trim());
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("fastbound_commit_error", err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // ── ShipStation: Create label ─────────────────────────────────────────
+  app.post("/api/admin/submissions/:id/shipstation-label", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { weightOz, packageCode } = req.body || {};
+
+      // Get submission + dealer shipping info
+      const subResult = await pool.query(
+        `SELECT s.*, d.business_name, d.contact_name, d.email, d.phone,
+                d.business_address, d.city, d.state, d.zip
+           FROM submissions s
+           LEFT JOIN dealer_submissions ds ON ds.submission_id = s.id
+           LEFT JOIN dealers d ON d.id = ds.dealer_id
+          WHERE s.id = $1 LIMIT 1`,
+        [id]
+      );
+      const sub = subResult.rows[0];
+      if (!sub) return res.status(404).json({ ok: false, error: "Submission not found" });
+
+      const shipTo = {
+        name: sub.contact_name || "",
+        companyName: sub.business_name || undefined,
+        phone: sub.phone || "",
+        addressLine1: sub.business_address || sub.customer_address || "",
+        city: sub.city || sub.customer_city || "",
+        state: sub.state || sub.customer_state || "",
+        postalCode: sub.zip || sub.customer_zip || "",
+      };
+
+      const label = await createLabel(shipTo, {
+        weightOz: weightOz ? Number(weightOz) : 10,
+        packageCode: packageCode || "medium_flat_rate_box",
+      });
+
+      await saveLabelInfo(id, label);
+      return res.json({ ok: true, ...label });
+    } catch (err: any) {
+      console.error("shipstation_label_error", err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // ── Form 3 Approved: Full workflow ───────────────────────────────────
+  app.post("/api/admin/submissions/:id/form3-approved", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // 1. Create ShipStation label
+      const labelRes = await fetch(`${req.protocol}://${req.get("host")}/api/admin/submissions/${id}/shipstation-label`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weightOz: 10, packageCode: "medium_flat_rate_box" }),
+      });
+      if (!labelRes.ok) throw new Error("ShipStation label creation failed");
+      const label = await labelRes.json();
+
+      // 2. Commit FastBound disposition with tracking
+      const commitRes = await fetch(`${req.protocol}://${req.get("host")}/api/admin/submissions/${id}/fastbound-commit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackingNumber: label.trackingNumber }),
+      });
+      if (!commitRes.ok) throw new Error("FastBound commit failed");
+
+      // 3. Email dealer (packing list + tracking)
+      const subResult = await pool.query(`SELECT * FROM submissions WHERE id = $1`, [id]);
+      const sub = subResult.rows[0];
+      if (sub?.email) {
+        try {
+          await sendViaGmail({
+            to: sub.email,
+            bcc: BCC_EMAIL,
+            from: `DubDub22 Orders <orders@dubdub22.com>`,
+            subject: `Your DubDub22 Order Has Shipped`,
+            text: [
+              `Dear ${sub.contact_name || "Dealer"},`,
+              ``,
+              `Your DubDub22 suppressor order has shipped!`,
+              ``,
+              `Tracking: ${label.trackingNumber}`,
+              `Carrier: USPS Priority Mail`,
+              ``,
+              `Please retain this email for your records.`,
+              ``,
+              `- Double T Tactical / DubDub22`,
+            ].join("\n"),
+          });
+        } catch (e) { console.error("form3_dealer_email_error", e); }
+      }
+
+      return res.json({ ok: true, trackingNumber: label.trackingNumber, labelPdfUrl: label.labelPdfUrl });
+    } catch (err: any) {
+      console.error("form3_approved_error", err);
+      return res.status(500).json({ ok: false, error: err.message });
     }
   });
 

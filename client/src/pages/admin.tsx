@@ -433,7 +433,9 @@ function SubmissionsTab({
             onDelete={() => { console.log("delete card clicked", sub.id); setDeleteTarget(sub); }}
             onShip={() => setShipTarget(sub)}
             onInvoice={() => setInvoiceTarget(sub)}
-            onPaid={() => setPaidTarget(sub)} />)}
+            onPaid={() => setPaidTarget(sub)}
+            onFastBoundPending={() => { setFastBoundTarget(sub); setSerialInput(""); }}
+            onForm3Approved={() => setForm3Target(sub)} />)}
       </div>
 
       {/* Desktop table */}
@@ -460,7 +462,9 @@ function SubmissionsTab({
                 onInvoice={() => setInvoiceTarget(sub)}
                 onRequestDocs={() => setRequestDocsTarget(sub)}
                 onForm3Submitted={() => setForm3SubmittedTarget(sub)}
-                onPaid={() => setPaidTarget(sub)} />)}
+                onPaid={() => setPaidTarget(sub)}
+                onFastBoundPending={() => { setFastBoundTarget(sub); setSerialInput(""); }}
+                onForm3Approved={() => setForm3Target(sub)} />)}
           </tbody>
         </table>
       </div>
@@ -468,7 +472,11 @@ function SubmissionsTab({
   );
 }
 
-function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice, onPaid }: { sub: Submission; onArchive: () => void; onDelete: () => void; onShip: () => void; onInvoice: () => void; onPaid: () => void }) {
+function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice, onPaid, onFastBoundPending, onForm3Approved }: {
+  sub: Submission; onArchive: () => void; onDelete: () => void;
+  onShip: () => void; onInvoice: () => void; onPaid: () => void;
+  onFastBoundPending?: () => void; onForm3Approved?: () => void;
+}) {
   return (
     <div className={`border border-border rounded-lg p-3 bg-card hover:bg-secondary/5 ${sub.archived ? "opacity-60 bg-secondary/5" : ""}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -550,35 +558,61 @@ function SubmissionCard({ sub, onArchive, onDelete, onShip, onInvoice, onPaid }:
               </Button>
             )}
           </div>
-        ) : (
-          <div className="space-y-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className={`w-full h-8 text-xs ${!sub.form3SubmittedAt ? "border-gray-400 text-gray-400 cursor-not-allowed" : (sub.trackingNumber ? "border-green-600 text-green-600 hover:bg-green-50" : "border-primary text-primary hover:bg-primary/10")}`}
-              onClick={!sub.form3SubmittedAt ? undefined : (sub.trackingNumber ? undefined : onShip)}
-            >
-              {sub.trackingNumber ? "✓ Shipped" : (!sub.form3SubmittedAt ? "Awaiting Form 3" : "Mark as Shipped")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`w-full h-8 text-xs ${sub.hasInvoice
-                ? "border-green-600 text-green-600 hover:bg-green-50"
-                : "border-red-600 text-red-600 hover:bg-red-50"
-              }`}
-              onClick={onInvoice}
-            >
-              {sub.hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
-            </Button>
-          </div>
-        )}
+          ) : (
+            <div className="space-y-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className={`w-full h-8 text-xs ${!sub.form3SubmittedAt ? "border-gray-400 text-gray-400 cursor-not-allowed" : (sub.trackingNumber ? "border-green-600 text-green-600 hover:bg-green-50" : "border-primary text-primary hover:bg-primary/10")}`}
+                onClick={!sub.form3SubmittedAt ? undefined : (sub.trackingNumber ? undefined : onShip)}
+              >
+                {sub.trackingNumber ? "✓ Shipped" : (!sub.form3SubmittedAt ? "Awaiting Form 3" : "Mark as Shipped")}
+              </Button>
+              {!sub.trackingNumber && onFastBoundPending && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs border-blue-600 text-blue-600 hover:bg-blue-50"
+                  onClick={onFastBoundPending}
+                  title="Assign serials & create FastBound pending disposition"
+                >
+                  FB Pending
+                </Button>
+              )}
+              {!sub.trackingNumber && onForm3Approved && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs border-green-600 text-green-600 hover:bg-green-50"
+                  onClick={onForm3Approved}
+                  title="Form 3 Approved: create label, commit FastBound, email dealer"
+                >
+                  Form 3 ✓
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className={`w-full h-8 text-xs ${sub.hasInvoice
+                  ? "border-green-600 text-green-600 hover:bg-green-50"
+                  : "border-red-600 text-red-600 hover:bg-red-50"
+                }`}
+                onClick={onInvoice}
+              >
+                {sub.hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
+              </Button>
+            </div>
+          )}
       </div>
     </div>
   );
 }
 
-function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestDocs, onForm3Submitted, onPaid }: { sub: Submission; onArchive: () => void; onDelete: () => void; onShip: () => void; onInvoice: () => void; onRequestDocs: () => void; onForm3Submitted?: () => void; onPaid: () => void }) {
+function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestDocs, onForm3Submitted, onPaid, onFastBoundPending, onForm3Approved }: {
+  sub: Submission; onArchive: () => void; onDelete: () => void; onShip: () => void; onInvoice: () => void;
+  onRequestDocs: () => void; onForm3Submitted?: () => void; onPaid: () => void;
+  onFastBoundPending?: () => void; onForm3Approved?: () => void;
+}) {
   return (
     <tr className={`border-b border-border hover:bg-secondary/10 ${sub.archived ? "opacity-50" : ""}`}>
       <td className="px-3 py-3 whitespace-nowrap text-muted-foreground text-xs font-mono">{fmtDate(sub.createdAt)}</td>
@@ -673,17 +707,39 @@ function SubmissionRow({ sub, onArchive, onDelete, onShip, onInvoice, onRequestD
             >
               {sub.hasInvoice ? `✓ Invoice Sent` : "Send Invoice"}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`h-7 text-xs whitespace-nowrap ${!sub.form3SubmittedAt ? "border-gray-400 text-gray-400 cursor-not-allowed" : (sub.trackingNumber ? "border-green-600 text-green-600 hover:bg-green-50" : "border-primary text-primary hover:bg-primary/10")}`}
-              onClick={!sub.form3SubmittedAt ? undefined : (sub.trackingNumber ? undefined : onShip)}
-              title={!sub.form3SubmittedAt ? "Form 3 must be sent before marking shipped" : (sub.trackingNumber ? "Already shipped" : "Mark as shipped")}
-            >
-              {sub.trackingNumber ? "✓ Shipped" : (!sub.form3SubmittedAt ? "Awaiting Form 3" : "Mark Shipped")}
-            </Button>
-          </div>
-        )}
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-7 text-xs whitespace-nowrap ${!sub.form3SubmittedAt ? "border-gray-400 text-gray-400 cursor-not-allowed" : (sub.trackingNumber ? "border-green-600 text-green-600 hover:bg-green-50" : "border-primary text-primary hover:bg-primary/10")}`}
+                onClick={!sub.form3SubmittedAt ? undefined : (sub.trackingNumber ? undefined : onShip)}
+                title={!sub.form3SubmittedAt ? "Form 3 must be sent before marking shipped" : (sub.trackingNumber ? "Already shipped" : "Mark as shipped")}
+              >
+                {sub.trackingNumber ? "✓ Shipped" : (!sub.form3SubmittedAt ? "Awaiting Form 3" : "Mark Shipped")}
+              </Button>
+              {!sub.trackingNumber && onFastBoundPending && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs whitespace-nowrap border-blue-600 text-blue-600 hover:bg-blue-50"
+                  onClick={onFastBoundPending}
+                  title="Assign serials & create FastBound pending disposition"
+                >
+                  FB Pending
+                </Button>
+              )}
+              {!sub.trackingNumber && onForm3Approved && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs whitespace-nowrap border-green-600 text-green-600 hover:bg-green-50"
+                  onClick={onForm3Approved}
+                  title="Form 3 Approved: create label, commit FastBound, email dealer"
+                >
+                  Form 3 ✓
+                </Button>
+              )}
+            </div>
+          )}
       </td>
       <td className="px-3 py-3">
         <div className="flex gap-1">
@@ -3144,6 +3200,13 @@ export default function AdminPage() {
   const [retailInquiryDeleteTarget, setRetailInquiryDeleteTarget] = useState<any | null>(null);
   const [retailInquiryStatus, setRetailInquiryStatus] = useState("all");
 
+  // FastBound & Form 3 state
+  const [fastBoundTarget, setFastBoundTarget] = useState<Submission | null>(null);
+  const [form3Target, setForm3Target] = useState<Submission | null>(null);
+  const [serialInput, setSerialInput] = useState("");
+  const [fastBoundLoading, setFastBoundLoading] = useState(false);
+  const [form3Loading, setForm3Loading] = useState(false);
+
   const pinForm = useForm<z.infer<typeof pinSchema>>({ resolver: zodResolver(pinSchema), defaultValues: { pin: "" } });
 
   const fetchSubmissions = useCallback(async (tabOverride?: string) => {
@@ -3340,6 +3403,44 @@ export default function AdminPage() {
     finally { setRetailInquiryDeleteTarget(null); }
   };
 
+  const handleFastBoundPending = async () => {
+    if (!fastBoundTarget || !serialInput.trim()) return;
+    setFastBoundLoading(true);
+    try {
+      const serials = serialInput.split(",").map(s => s.trim()).filter(Boolean);
+      const res = await fetch(`/api/admin/submissions/${fastBoundTarget.id}/fastbound-pending`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serialNumbers: serials }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "FastBound error");
+      toast({ title: "Pending Disposition Created", description: `ID: ${data.dispositionId}` });
+      setFastBoundTarget(null);
+      setSerialInput("");
+      fetchSubmissions();
+    } catch (err: any) {
+      toast({ title: "FastBound Error", description: err.message, variant: "destructive" });
+    } finally { setFastBoundLoading(false); }
+  };
+
+  const handleForm3Approved = async () => {
+    if (!form3Target) return;
+    setForm3Loading(true);
+    try {
+      const res = await fetch(`/api/admin/submissions/${form3Target.id}/form3-approved`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Form 3 workflow failed");
+      toast({ title: "Form 3 Approved", description: `Tracking: ${data.trackingNumber}` });
+      setForm3Target(null);
+      fetchSubmissions();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setForm3Loading(false); }
+  };
 
   if (authStatus === "checking") {
     return <div className="min-h-screen bg-background flex items-center justify-center">
@@ -3760,6 +3861,66 @@ export default function AdminPage() {
               disabled={form3SubmittedSaving}
             >
               {form3SubmittedSaving ? "Sending..." : "Send Email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* FastBound: Assign Serials & Create Pending Disposition */}
+      <Dialog open={!!fastBoundTarget} onOpenChange={(o) => { if (!o) { setFastBoundTarget(null); setSerialInput(""); } }}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle>FastBound: Assign Serials</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Enter serial numbers for {fastBoundTarget?.contactName} (Qty: {fastBoundTarget?.quantity || "1"}).
+              Separate multiple serials with commas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Input
+              placeholder="e.g. DD22001, DD22002"
+              value={serialInput}
+              onChange={(e) => setSerialInput(e.target.value)}
+              className="bg-background"
+            />
+            <p className="text-xs text-muted-foreground">
+              This creates a pending disposition in FastBound with the dealer contact and serials.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setFastBoundTarget(null); setSerialInput(""); }}>Cancel</Button>
+            <Button
+              onClick={handleFastBoundPending}
+              disabled={fastBoundLoading || !serialInput.trim()}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {fastBoundLoading ? "Creating..." : "Create Pending Disposition"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Form 3 Approved: Full Workflow */}
+      <Dialog open={!!form3Target} onOpenChange={(o) => { if (!o) setForm3Target(null); }}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle>Form 3 Approved</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              This will: (1) Create USPS shipping label, (2) Push tracking to FastBound, (3) Commit disposition, (4) Email dealer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm font-medium">Dealer: {form3Target?.contactName}</p>
+            <p className="text-xs text-muted-foreground">Serial: {form3Target?.serialNumber || "Not assigned"}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForm3Target(null)}>Cancel</Button>
+            <Button
+              onClick={handleForm3Approved}
+              disabled={form3Loading}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              {form3Loading ? "Processing..." : "Run Form 3 Workflow"}
             </Button>
           </DialogFooter>
         </DialogContent>
