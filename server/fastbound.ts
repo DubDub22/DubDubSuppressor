@@ -186,8 +186,19 @@ export async function createPendingDisposition(
     }),
   });
 
-  // 4. Add items (serials) one by one
+  // 4. Validate serials exist in FastBound inventory (optional check)
+  const inventory = await searchInventoryItems({
+    manufacturer: "DOUBLE TACTICAL",
+    limit: 1000,
+  });
+  const inventorySerials = new Set(inventory.map((i: any) => i.serialNumber));
+
+  // 5. Add items (serials) one by one
   for (const item of items) {
+    // Warn if serial not found in inventory (but still try to add)
+    if (!inventorySerials.has(item.serialNumber)) {
+      console.warn(`Serial ${item.serialNumber} not found in FastBound inventory`);
+    }
     await fbFetch(`/dispositions/${dispositionId}/items`, {
       method: "POST",
       body: JSON.stringify({
@@ -303,4 +314,27 @@ export async function getDispositionId(
     [submissionId],
   );
   return res.rows[0]?.fastbound_disposition_id ?? null;
+}
+
+/**
+ * Search FastBound items in inventory (not disposed yet).
+ * Filters by manufacturer "DOUBLE TACTICAL" and optionally model.
+ * Limits results to quantity ordered.
+ * Returns array of items with id, serialNumber, etc.
+ */
+export async function searchInventoryItems(params: {
+  manufacturer?: string; // default "DOUBLE TACTICAL"
+  model?: string;         // e.g. "DubDub22 Suppressor"
+  limit?: number;        // max items to return (match order qty)
+}): Promise<any[]> {
+  const query = new URLSearchParams();
+  // Always filter by your manufacturer to only show DubDub22 suppressors
+  query.set("manufacturer", params.manufacturer || "DOUBLE TACTICAL");
+  if (params.model) query.set("model", params.model);
+  query.set("dispositionId", "null"); // Only items in inventory (not disposed)
+  if (params.limit) query.set("limit", String(params.limit));
+  query.set("openOnly", "true"); // Only open (not deleted) items
+
+  const res: any = await fbFetch(`/items?${query.toString()}`);
+  return res.data || res || [];
 }
