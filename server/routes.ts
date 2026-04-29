@@ -14,12 +14,13 @@ import { registerWildRoutes } from "./routes/wild.ts";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { uploadDealerDocuments, sftpRead, fflToFolderName } from "./sftp-upload";
+import { sftpRead, fflToFolderName } from "./sftp-upload";
 import { pool } from "./db";
 import { loadFFLMaster, validateFFL } from "./ffl-master";
 import {
   createPendingDisposition, commitDisposition,
   saveDispositionId, getDispositionId,
+  uploadDealerDocumentsToFastBound,
 } from "./fastbound";
 import { createLabel, saveLabelInfo } from "./shipstation";
 
@@ -898,13 +899,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET ffl_file_name = $1, ffl_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [fflFileName || "ffl-file", fflFileData, sub.rows[0].ffl_license_number]
         );
-        // Archive to 3dprintmanager via SFTP
-        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
+        // Upload to FastBound contact
+        uploadDealerDocumentsToFastBound(sub.rows[0].ffl_license_number, {
           fflFileData, fflFileName,
-          sotFileData: undefined, sotFileName: undefined,
-          resaleFileData: undefined, resaleFileName: undefined,
-          taxFormFileData: undefined, taxFormFileName: undefined,
-        }).catch(err => console.error("sftp_upload_ffl_error", err));
+        }).catch(err => console.error("fastbound_upload_ffl_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
@@ -930,13 +928,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET sot_file_name = $1, sot_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [sotFileName || "sot-file", sotFileData, sub.rows[0].ffl_license_number]
         );
-        // Archive to 3dprintmanager via SFTP
-        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
-          fflFileData: undefined, fflFileName: undefined,
-          sotFileData, sotFileName,
-          resaleFileData: undefined, resaleFileName: undefined,
-          taxFormFileData: undefined, taxFormFileName: undefined,
-        }).catch(err => console.error("sftp_upload_sot_error", err));
+        // Upload to FastBound contact
+        uploadDealerDocumentsToFastBound(sub.rows[0].ffl_license_number, {
+          sotFileData: sotFileData, sotFileName: sotFileName,
+        }).catch(err => console.error("fastbound_upload_sot_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
@@ -962,13 +957,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET sales_tax_form_name = $1, sales_tax_form_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [taxFormName || "tax-form", taxFormData, sub.rows[0].ffl_license_number]
         );
-        // Archive to 3dprintmanager via SFTP (tax form maps to TaxUseForm)
-        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
-          fflFileData: undefined, fflFileName: undefined,
-          sotFileData: undefined, sotFileName: undefined,
-          resaleFileData: undefined, resaleFileName: undefined,
-          taxFormFileData, taxFormFileName,
-        }).catch(err => console.error("sftp_upload_taxform_error", err));
+        // Upload to FastBound contact
+        uploadDealerDocumentsToFastBound(sub.rows[0].ffl_license_number, {
+          taxFormFileData: taxFormData, taxFormFileName: taxFormName,
+        }).catch(err => console.error("fastbound_upload_taxform_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
@@ -994,13 +986,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `UPDATE dealers SET state_tax_file_name = $1, state_tax_file_data = $2, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $3`,
           [stateTaxFileName || "state-tax-form", stateTaxFileData, sub.rows[0].ffl_license_number]
         );
-        // Archive to 3dprintmanager via SFTP (state tax maps to ResaleCert)
-        uploadDealerDocuments(sub.rows[0].ffl_license_number, {
-          fflFileData: undefined, fflFileName: undefined,
-          sotFileData: undefined, sotFileName: undefined,
+        // Upload to FastBound contact
+        uploadDealerDocumentsToFastBound(sub.rows[0].ffl_license_number, {
           resaleFileData: stateTaxFileData, resaleFileName: stateTaxFileName,
-          taxFormFileData: undefined, taxFormFileName: undefined,
-        }).catch(err => console.error("sftp_upload_state_tax_error", err));
+        }).catch(err => console.error("fastbound_upload_state_tax_error", err));
       }
       return res.json({ ok: true });
     } catch (err: any) {
@@ -1908,16 +1897,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasTax = !!(taxFormData && taxFormName);
 
       if (normalized && (hasFfl || hasSot || hasTax)) {
-        uploadDealerDocuments(normalized, {
+        // Upload to FastBound contact
+        uploadDealerDocumentsToFastBound(normalized, {
           fflFileData: fflFileData || undefined,
           fflFileName: fflFileName || undefined,
           sotFileData: sotFileData || undefined,
           sotFileName: sotFileName || undefined,
-          resaleFileData: undefined,
-          resaleFileName: undefined,
           taxFormFileData: taxFormData || undefined,
-          taxFormName: taxFormName || undefined,
-        }).catch(err => console.error("sftp_upload_dealer_docs_error", err));
+          taxFormFileName: taxFormName || undefined,
+        }).catch(err => console.error("fastbound_upload_dealer_docs_error", err));
         await pool.query(
           `UPDATE dealers SET ffl_on_file = $1, sot_on_file = $2, tax_form_on_file = $3, updated_at = CURRENT_TIMESTAMP WHERE ffl_license_number = $4`,
           [hasFfl, hasSot, hasTax, normalized]
@@ -2247,7 +2235,8 @@ DubDub22 Minions`;
       const hasAnyFile = hasFflFile || hasSotFile || hasTaxFile;
 
       if (fflNumber && hasAnyFile) {
-        uploadDealerDocuments(fflNumber, {
+        // Upload to FastBound contact
+        uploadDealerDocumentsToFastBound(fflNumber, {
           fflFileData: fflFileData || undefined,
           fflFileName: fflFileName || undefined,
           sotFileData: sotFileData || undefined,
@@ -2255,8 +2244,8 @@ DubDub22 Minions`;
           resaleFileData: resaleFileData || undefined,
           resaleFileName: resaleFileName || undefined,
           taxFormFileData: taxFormFileData || undefined,
-          taxFormName: taxFormFileName || undefined,
-        }).catch(err => console.error("sftp_upload_dealer_docs_error", err));
+          taxFormFileName: taxFormFileName || undefined,
+        }).catch(err => console.error("fastbound_upload_dealer_docs_error", err));
         if (existingDealer?.id) {
           await pool.query(
             `UPDATE dealers SET ffl_on_file = COALESCE($1, ffl_on_file), sot_on_file = COALESCE($2, sot_on_file), tax_form_on_file = COALESCE($3, tax_form_on_file), updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
@@ -2592,16 +2581,11 @@ IMPORTANT — Tax Form Note: Download the PDF before filling it out. Do NOT fill
         );
         const fflForUpload = dealerRow.rows[0]?.ffl_license_number;
         if (fflForUpload) {
-          uploadDealerDocuments(fflForUpload, {
+          // Upload to FastBound contact
+          uploadDealerDocumentsToFastBound(fflForUpload, {
             fflFileData,
             fflFileName: fflFileName || null,
-            sotFileData: undefined,
-            sotFileName: undefined,
-            resaleFileData: undefined,
-            resaleFileName: undefined,
-            taxFormFileData: undefined,
-            taxFormFileName: undefined,
-          }).catch(err => console.error("sftp_upload_dealer_docs_error", err));
+          }).catch(err => console.error("fastbound_upload_dealer_docs_error", err));
         }
       }
 

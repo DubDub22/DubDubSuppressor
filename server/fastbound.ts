@@ -251,6 +251,66 @@ export async function uploadContactDocument(
 }
 
 /**
+ * Upload dealer documents to FastBound contact.
+ * Replaces SFTP uploads — documents stored per contact in FastBound.
+ * Creates/gets FFL contact first, then uploads documents.
+ */
+export async function uploadDealerDocumentsToFastBound(
+  fflNumber: string,
+  documents: {
+    fflFileData?: string;
+    fflFileName?: string;
+    sotFileData?: string;
+    sotFileName?: string;
+    resaleFileData?: string;
+    resaleFileName?: string;
+    taxFormFileData?: string;
+    taxFormFileName?: string;
+  }
+): Promise<void> {
+  try {
+    // Create or get FFL contact in FastBound
+    const contactId = await createOrUpdateContact({ fflNumber });
+
+    // Upload each document
+    const uploads: Promise<any>[] = [];
+
+    if (documents.fflFileData && documents.fflFileName) {
+      uploads.push(
+        uploadContactDocument(contactId, documents.fflFileName, documents.fflFileData, "FFL License")
+          .catch(err => console.error("fastbound_upload_ffl_error", err.message))
+      );
+    }
+
+    if (documents.sotFileData && documents.sotFileName) {
+      uploads.push(
+        uploadContactDocument(contactId, documents.sotFileName, documents.sotFileData, "SOT License")
+          .catch(err => console.error("fastbound_upload_sot_error", err.message))
+      );
+    }
+
+    if (documents.resaleFileData && documents.resaleFileName) {
+      uploads.push(
+        uploadContactDocument(contactId, documents.resaleFileName, documents.resaleFileData, "Resale Certificate")
+          .catch(err => console.error("fastbound_upload_resale_error", err.message))
+      );
+    }
+
+    if (documents.taxFormFileData && documents.taxFormFileName) {
+      uploads.push(
+        uploadContactDocument(contactId, documents.taxFormFileName, documents.taxFormFileData, "Tax Form")
+          .catch(err => console.error("fastbound_upload_taxform_error", err.message))
+      );
+    }
+
+    await Promise.all(uploads);
+    console.log(`[fastbound] Uploaded dealer documents for FFL ${fflNumber}`);
+  } catch (err: any) {
+    console.error("fastbound_upload_dealer_docs_error", err.message);
+  }
+}
+
+/**
  * Commit a pending disposition after Form 3 is approved.
  * Pushes tracking number into the disposition before committing.
  */
