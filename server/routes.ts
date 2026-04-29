@@ -21,7 +21,7 @@ import {
   createPendingDisposition, commitDisposition,
   saveDispositionId, getDispositionId,
   uploadDealerDocumentsToFastBound,
-  createOrUpdateContact, listContactAttachments, downloadContactAttachment,
+  findContactByFFL, listContactAttachments, downloadContactAttachment,
 } from "./fastbound";
 import { createLabel, saveLabelInfo } from "./shipstation";
 

@@ -430,17 +430,19 @@ export async function listContactAttachments(contactId: string): Promise<any[]> 
 
 /**
  * Download a contact attachment from FastBound.
- * Returns the file buffer.
+ * Returns the file as a Buffer (works in Node.js).
  */
-export async function downloadContactAttachment(contactId: string, attachmentId: string): Promise<Blob> {
+export async function downloadContactAttachment(contactId: string, attachmentId: string): Promise<Buffer> {
   const url = `${BASE}/contacts/${contactId}/attachments/${attachmentId}`;
   const headers = authHeaders();
-  delete headers["Content-Type"]; // GET request doesn't need Content-Type
+  delete headers["Content-Type"];
 
   const res = await fetch(url, { headers });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`FastBound ${res.status} download attachment – ${body}`);
   }
-  return res.blob();
+
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
