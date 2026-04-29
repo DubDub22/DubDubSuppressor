@@ -387,7 +387,7 @@ export async function searchInventoryItems(params: {
   manufacturer?: string; // default "DOUBLE TACTICAL"
   model?: string;         // e.g. "DubDub22 Suppressor"
   limit?: number;        // max items to return (match order qty)
-}): Promise<any[]> {
+}: Promise<any[]> {
   const query = new URLSearchParams();
   // Always filter by your manufacturer to only show DubDub22 suppressors
   query.set("manufacturer", params.manufacturer || "DOUBLE TACTICAL");
@@ -398,4 +398,49 @@ export async function searchInventoryItems(params: {
 
   const res: any = await fbFetch(`/items?${query.toString()}`);
   return res.data || res || [];
+}
+
+/**
+ * Search for a FastBound contact by FFL number.
+ * Returns the contact ID if found, null otherwise.
+ */
+export async function findContactByFFL(fflNumber: string): Promise<string | null> {
+  try {
+    const query = new URLSearchParams({ fflNumber });
+    const res: any = await fbFetch(`/contacts?${query.toString()}`);
+    const contacts = res.data || res || [];
+    if (contacts.length > 0) {
+      return contacts[0].id;
+    }
+    return null;
+  } catch (err) {
+    console.error("findContactByFFL error:", err);
+    return null;
+  }
+}
+
+/**
+ * List attachments for a FastBound contact.
+ * Returns array of attachments with id, fileName, etc.
+ */
+export async function listContactAttachments(contactId: string): Promise<any[]> {
+  const res: any = await fbFetch(`/contacts/${contactId}/attachments`);
+  return res.data || res || [];
+}
+
+/**
+ * Download a contact attachment from FastBound.
+ * Returns the file buffer.
+ */
+export async function downloadContactAttachment(contactId: string, attachmentId: string): Promise<Blob> {
+  const url = `${BASE}/contacts/${contactId}/attachments/${attachmentId}`;
+  const headers = authHeaders();
+  delete headers["Content-Type"]; // GET request doesn't need Content-Type
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`FastBound ${res.status} download attachment – ${body}`);
+  }
+  return res.blob();
 }

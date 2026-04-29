@@ -21,6 +21,7 @@ import {
   createPendingDisposition, commitDisposition,
   saveDispositionId, getDispositionId,
   uploadDealerDocumentsToFastBound,
+  createOrUpdateContact, listContactAttachments, downloadContactAttachment,
 } from "./fastbound";
 import { createLabel, saveLabelInfo } from "./shipstation";
 
@@ -731,44 +732,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ffl = row.dealer_ffl_num || row.ffl_license_number || undefined;
       }
 
-      // File naming matches uploadDealerDocuments: {folder}{TYPE}.{ext}
-      // e.g. 54806170FFL.pdf, 54806170SOT.pdf, 54806170TaxUseForm.pdf, 54806170ResaleCert.pdf
-      const typeToFileType: Record<string, string> = {
-        ffl: "FFL",
-        sot: "SOT",
-        tax: "TaxUseForm",
-        state_tax: "TNResaleCert",
-      };
-      const fileType = typeToFileType[type];
-      if (!fileType) return res.status(400).json({ ok: false, error: "invalid_type" });
-
-      // Use sub-{id} folder if ffl is empty/NOFFL, otherwise use FFL-based folder
-      const rawFolder = ffl ? fflToFolderName(ffl) : "NOFFL";
-      const folder = (rawFolder === "NOFFL" || !ffl) ? `sub-${id}` : rawFolder;
-      // Try .pdf and .png extensions (state_tax may be image)
-      const remotePath = `/home/dealer-uploader/dealer-docs/${folder}/${folder}${fileType}.pdf`;
-
-      try {
-        const buf = await sftpRead(remotePath);
-        const contentType = "application/pdf";
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Content-Disposition", `inline; filename=\"${type}_${id}.pdf\"`);
-        res.setHeader("Content-Length", buf.length);
-        res.end(buf);
-      } catch (err: any) {
-        // Try .png fallback
-        const pngPath = `/home/dealer-uploader/dealer-docs/${folder}/${folder}${fileType}.png`;
-        try {
-          const buf = await sftpRead(pngPath);
-          res.setHeader("Content-Type", "image/png");
-          res.setHeader("Content-Disposition", `inline; filename=\"${type}_${id}.png\"`);
-          res.setHeader("Content-Length", buf.length);
-          res.end(buf);
-        } catch {
-          console.error(`sftp_read_error ${type}`, err.message, remotePath);
-          return res.status(404).json({ ok: false, error: "file_not_found" });
-        }
+      if (!ffl) {
+        return res.status(400).json({ ok: false, error: "ffl_not_found" });
       }
+
+      // Map type to FastBound attachment description keyword
+      const typeToDescription: Record<string, string> = {
+        ffl: "FFL License",
+        sot: "SOT License",
+        tax: "Tax Form",
+        state_tax: "Resale Certificate",
+      };
+      const descriptionKeyword = typeToDescription[type];
+      if (!descriptionKeyword) return res.status(400).json({ ok: false, error: "invalid_type" });
+
+      // Find FastBound contact by FFL number
+      const contactId = await findContactByFFL(ffl);
+      if (!contactId) {
+        return res.status(404).json({ ok: false, error: "contact_not_found" });
+      }
+
+      // List attachments and find the one matching our type
+      const attachments = await listContactAttachments(contactId);
+      const attachment = attachments.find((a: any) =>
+        a.description?.includes(descriptionKeyword) ||
+        a.fileName?.toLowerCase().includes(type)
+      );
+
+      if (!attachment) {
+        return res.status(404).json({ ok: false, error: "file_not_found" });
+      }
+
+      // Download the attachment from FastBound
+      const blob = await downloadContactAttachment(contactId, attachment.id);
+      const arrayBuffer = await blob.arrayBuffer();
+      const buf = Buffer.from(arrayBuffer);
+
+      // Determine content type
+      const fileName = attachment.fileName || `${type}_${id}`;
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      const contentType = ext === 'png' ? 'image/png' :
+                         ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+                         'application/pdf';
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+      res.setHeader("Content-Length", buf.length);
+      res.end(buf);
     } catch (err: any) {
       console.error("file_download_error", err);
       return res.status(500).json({ ok: false, error: "download_failed" });
