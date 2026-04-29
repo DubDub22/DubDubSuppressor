@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format, parseISO } from "date-fns";
 import {
   Copy, Image as ImageIcon, Download, Trash2, Package, Archive,
-  ChevronRight, ArrowLeft, Building2, FileText,
+  ChevronRight, ArrowLeft, ArrowUpDown, Building2, FileText,
   Upload, Eye, X, Search, Inbox,
   MessageSquare, ShieldCheck, Phone, Files, CheckCircle, XCircle, Send,
   RefreshCw, Store, ShoppingCart
@@ -134,7 +134,7 @@ type Dealer = {
   submissions?: Submission[];
 };
 
-type Tab = "submissions" | "warranty" | "dealer_inquiries" | "retail_inquiries" | "retail" | "files" | "tax_forms" | "archives";
+type Tab = "submissions" | "warranty" | "dealer_inquiries" | "retail_inquiries" | "retail" | "files" | "archives";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 
@@ -2241,11 +2241,12 @@ function WarrantyTab({
               <th className="px-3 py-2">Customer</th>
               <th className="px-3 py-2">Description</th>
               <th className="px-3 py-2">Notes</th>
+              <th className="px-3 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No warranty claims found.</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">No warranty claims found.</td></tr>
             ) : filtered.map(r => (
               <tr key={r.id} className="border-b border-border hover:bg-secondary/10">
                 <td className="px-3 py-3 whitespace-nowrap text-xs text-muted-foreground font-mono">
@@ -2282,6 +2283,55 @@ function WarrantyTab({
                 <td className="px-3 py-3">
                   <div className="text-xs text-muted-foreground max-w-[120px] truncate">{r.admin_notes || "—"}</div>
                 </td>
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-orange-500 hover:text-orange-400"
+                      title={r.archived ? "Unarchive" : "Archive"}
+                      onClick={async () => {
+                        setUpdating(String(r.id));
+                        try {
+                          const url = r.archived
+                            ? `/api/admin/warranty-requests/${r.id}/unarchive`
+                            : `/api/admin/warranty-requests/${r.id}/archive`;
+                          const res = await fetch(url, { method: "PATCH" });
+                          if (!res.ok) throw new Error();
+                          toast({ title: r.archived ? "Unarchived" : "Archived" });
+                          onRefresh();
+                        } catch {
+                          toast({ title: "Error", variant: "destructive" });
+                        } finally { setUpdating(null); }
+                      }}
+                    >
+                      {r.archived ? <ArrowUpDown className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-red-500 hover:text-red-400"
+                      title="Delete"
+                      onClick={() => {
+                        if (confirm(`Delete warranty claim for ${r.customer_name || r.contact_name || r.id}? This cannot be undone.`)) {
+                          (async () => {
+                            setUpdating(String(r.id));
+                            try {
+                              const res = await fetch(`/api/admin/warranty-requests/${r.id}`, { method: "DELETE" });
+                              if (!res.ok) throw new Error();
+                              toast({ title: "Deleted" });
+                              onRefresh();
+                            } catch {
+                              toast({ title: "Error deleting", variant: "destructive" });
+                            } finally { setUpdating(null); }
+                          })();
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -2308,6 +2358,51 @@ function WarrantyTab({
               <p className="text-xs text-muted-foreground">{r.customer_name || "—"} {r.customer_email && `(${r.customer_email})`}</p>
               {r.description && <p className="text-xs border-t border-border pt-1 mt-1">{r.description}</p>}
               {r.admin_notes && <p className="text-xs text-muted-foreground italic">Note: {r.admin_notes}</p>}
+            </div>
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs text-orange-600 border-orange-300 hover:bg-orange-50"
+                onClick={async () => {
+                  setUpdating(String(r.id));
+                  try {
+                    const url = r.archived
+                      ? `/api/admin/warranty-requests/${r.id}/unarchive`
+                      : `/api/admin/warranty-requests/${r.id}/archive`;
+                    const res = await fetch(url, { method: "PATCH" });
+                    if (!res.ok) throw new Error();
+                    toast({ title: r.archived ? "Unarchived" : "Archived" });
+                    onRefresh();
+                  } catch {
+                    toast({ title: "Error", variant: "destructive" });
+                  } finally { setUpdating(null); }
+                }}
+              >
+                {r.archived ? "Unarchive" : "Archive"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
+                onClick={() => {
+                  if (confirm(`Delete warranty claim for ${r.customer_name || r.contact_name || r.id}? This cannot be undone.`)) {
+                    (async () => {
+                      setUpdating(String(r.id));
+                      try {
+                        const res = await fetch(`/api/admin/warranty-requests/${r.id}`, { method: "DELETE" });
+                        if (!res.ok) throw new Error();
+                        toast({ title: "Deleted" });
+                        onRefresh();
+                      } catch {
+                        toast({ title: "Error deleting", variant: "destructive" });
+                      } finally { setUpdating(null); }
+                    })();
+                  }
+                }}
+              >
+                Delete
+              </Button>
             </div>
           </div>
         ))}
@@ -2528,228 +2623,6 @@ function RetailInquiriesTab({
   );
 }
 
-
-// ── Tax Forms Tab ─────────────────────────────────────────────────────────────
-
-function TaxFormsTab() {
-  const { toast } = useToast();
-  const [forms, setForms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [reviewTarget, setReviewTarget] = useState<any | null>(null);
-  const [previewPdf, setPreviewPdf] = useState<string | null>(null);
-  const [denyReason, setDenyReason] = useState("");
-  const [sendingLink, setSendingLink] = useState<string | null>(null);
-
-  const fetchForms = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/tax-forms");
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setForms(Array.isArray(data.data) ? data.data : []);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => { fetchForms(); }, [fetchForms]);
-
-  const handleSendUploadLink = async (dealerId: string, submissionId?: string, fflNumber?: string) => {
-    try {
-      setSendingLink(dealerId);
-      const res = await fetch("/api/tax-form/send-upload-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dealerId, submissionId, fflNumber }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to send");
-      toast({ title: "Link Sent", description: `Upload link emailed to dealer. Token: ${data.token.slice(0, 8)}...` });
-      fetchForms();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setSendingLink(null);
-    }
-  };
-
-  const handleAccept = async (id: string) => {
-    try {
-      const res = await fetch(`/api/admin/tax-forms/${id}/accept`, { method: "POST" });
-      if (!res.ok) throw new Error("Accept failed");
-      toast({ title: "Accepted", description: "Tax form accepted and filed to 3dprintmanager." });
-      setReviewTarget(null);
-      fetchForms();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
-
-  const handleDeny = async (id: string) => {
-    if (!denyReason.trim()) {
-      toast({ title: "Reason Required", description: "Please enter a reason for the denial.", variant: "destructive" });
-      return;
-    }
-    try {
-      const res = await fetch(`/api/admin/tax-forms/${id}/deny`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: denyReason }),
-      });
-      if (!res.ok) throw new Error("Deny failed");
-      toast({ title: "Denied", description: "Dealer notified with re-upload link." });
-      setReviewTarget(null);
-      setDenyReason("");
-      fetchForms();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
-
-  const filtered = statusFilter === "all" ? forms : forms.filter(f => f.status === statusFilter);
-
-  const statusBadge = (status: string) => {
-    const map: Record<string, { label: string; cls: string }> = {
-      pending: { label: "Pending", cls: "bg-yellow-600/20 text-yellow-400 border-yellow-600/40" },
-      uploaded: { label: "Uploaded", cls: "bg-blue-600/20 text-blue-400 border-blue-600/40" },
-      accepted: { label: "Accepted", cls: "bg-green-600/20 text-green-400 border-green-600/40" },
-      denied: { label: "Denied", cls: "bg-red-600/20 text-red-400 border-red-600/40" },
-    };
-    const b = map[status] || { label: status, cls: "bg-gray-600/20 text-gray-400 border-gray-600/40" };
-    return <Badge className={`border ${b.cls}`}>{b.label}</Badge>;
-  };
-
-  if (loading) return <p className="text-muted-foreground text-sm">Loading...</p>;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h2 className="text-lg font-semibold">Tax Form Submissions</h2>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="bg-background border border-border text-sm rounded px-2 py-1.5"
-        >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="uploaded">Uploaded</option>
-          <option value="accepted">Accepted</option>
-          <option value="denied">Denied</option>
-        </select>
-      </div>
-
-      {filtered.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No tax form records found.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">Dealer</th>
-                <th className="pb-2 pr-4 font-medium">FFL</th>
-                <th className="pb-2 pr-4 font-medium">File</th>
-                <th className="pb-2 pr-4 font-medium">Status</th>
-                <th className="pb-2 pr-4 font-medium">Uploaded</th>
-                <th className="pb-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(form => (
-                <tr key={form.id} className="border-b border-border/50 hover:bg-muted/20">
-                  <td className="py-2.5 pr-4">
-                    <div className="font-medium">{form.dealer_name}</div>
-                    <div className="text-xs text-muted-foreground">{form.dealer_contact}</div>
-                  </td>
-                  <td className="py-2.5 pr-4 font-mono text-xs">{form.ffl_license_number || form.ffl_number}</td>
-                  <td className="py-2.5 pr-4 text-xs">{form.file_name || "—"}</td>
-                  <td className="py-2.5 pr-4">{statusBadge(form.status)}</td>
-                  <td className="py-2.5 pr-4 text-xs text-muted-foreground">
-                    {form.uploaded_at ? format(parseISO(form.uploaded_at), "MMM d, yyyy") : "—"}
-                  </td>
-                  <td className="py-2.5">
-                    <div className="flex gap-2 flex-wrap">
-                      {form.status === "pending" && (
-                        <Button
-                          variant="outline" size="sm" className="text-xs h-7"
-                          onClick={() => handleSendUploadLink(form.dealer_id, form.submission_id, form.ffl_number)}
-                          disabled={sendingLink === form.dealer_id}
-                        >
-                          <Send className="w-3 h-3 mr-1" />Send Upload Link
-                        </Button>
-                      )}
-                      {(form.status === "uploaded" || form.status === "denied") && (
-                        <Button
-                          variant="outline" size="sm" className="text-xs h-7"
-                          onClick={() => { setReviewTarget(form); setPreviewPdf(form.file_data ? `data:application/pdf;base64,${form.file_data}` : null); }}
-                        >
-                          <Eye className="w-3 h-3 mr-1" />Review
-                        </Button>
-                      )}
-                      {form.status === "accepted" && (
-                        <span className="text-xs text-muted-foreground flex items-center">
-                          <CheckCircle className="w-3 h-3 mr-1 text-green-500" />Filed
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Review Dialog */}
-      <Dialog open={!!reviewTarget} onOpenChange={open => !open && (setReviewTarget(null), setDenyReason(""), setPreviewPdf(null))}>
-        <DialogContent className="bg-card border-border max-w-3xl w-full max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Review Tax Form — {reviewTarget?.dealer_name}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden rounded border border-border bg-muted/30">
-            {previewPdf ? (
-              <iframe src={previewPdf} className="w-full h-[60vh] rounded" title="Tax Form PDF" />
-            ) : (
-              <div className="flex items-center justify-center h-[60vh] text-muted-foreground text-sm">
-                No PDF available for preview
-              </div>
-            )}
-          </div>
-          {reviewTarget?.status !== "accepted" && (
-            <div className="mt-4 space-y-3">
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Reason for denial (optional)..."
-                  value={denyReason}
-                  onChange={e => setDenyReason(e.target.value)}
-                  rows={2}
-                  className="bg-background border-border text-sm flex-1"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 text-green-400 border-green-600/40 hover:bg-green-600/10"
-                  onClick={() => handleAccept(reviewTarget?.id)}
-                >
-                  <CheckCircle className="w-4 h-4 mr-1" />Accept
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 text-red-400 border-red-600/40 hover:bg-red-600/10"
-                  onClick={() => handleDeny(reviewTarget?.id)}
-                >
-                  <XCircle className="w-4 h-4 mr-1" />Deny &amp; Notify
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
 
 // ── Serials Tab ────────────────────────────────────────────────────────────────
 
@@ -3560,14 +3433,6 @@ export default function AdminPage() {
             <Files className="w-4 h-4 inline mr-1.5" />Files
           </button>
           <button
-            onClick={() => { setTab("tax_forms"); }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              tab === "tax_forms" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <FileText className="w-4 h-4 inline mr-1.5" />Tax Forms
-          </button>
-          <button
             onClick={() => { setTab("archives"); fetchSubmissions("archives"); }}
             className={`pb-3 px-3 text-sm font-medium border-b-2 transition-colors ${
               tab === "archives" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
@@ -3651,14 +3516,6 @@ export default function AdminPage() {
           <Card className="bg-card/50 border-border">
             <CardContent className="p-4 md:p-6">
               <FilesTab />
-            </CardContent>
-          </Card>
-        )}
-
-        {tab === "tax_forms" && (
-          <Card className="bg-card/50 border-border">
-            <CardContent className="p-4 md:p-6">
-              <TaxFormsTab />
             </CardContent>
           </Card>
         )}
