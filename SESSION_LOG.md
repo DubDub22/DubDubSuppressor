@@ -4,6 +4,22 @@
 
 ---
 
+## 🚨 Errors Found & Fixed Today
+
+1. **fetch() syntax error** in `fastbound.ts:440`:
+   - ❌ `fetch(url, { headers })` (missing comma)
+   - ✅ `fetch(url, { method: 'GET', headers })`
+
+2. **Blob type not working in Node.js**:
+   - ❌ `Promise<Blob>` return type
+   - ✅ `Promise<Buffer>` with `Buffer.from(arrayBuffer)`
+
+3. **Missing import** in `routes.ts`:
+   - ❌ `createOrUpdateContact` imported but not used
+   - ✅ Fixed to import `findContactByFFL`
+
+---
+
 ## 🎯 Project Goal
 Integrate FastBound + ShipStation into DubDub22 suppressor order flow:
 1. Assign serials → FastBound pending disposition
