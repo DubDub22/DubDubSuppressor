@@ -3067,8 +3067,6 @@ export default function AdminPage() {
   const [fastBoundLoading, setFastBoundLoading] = useState(false);
   const [form3Loading, setForm3Loading] = useState(false);
 
-  const { toast } = useToast();
-
   const fetchSubmissions = useCallback(async (tabOverride?: string) => {
     const activeTab = tabOverride ?? tab;
     try {
