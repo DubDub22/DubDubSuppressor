@@ -57,9 +57,19 @@ export const dealers = pgTable("dealers", {
   // Demo unit tracking
   hasDemoUnitShipped: boolean("has_demo_unit_shipped").default(false), // true once a dealer_order has been shipped to this dealer
 
+  // Dealer account authentication
+  passwordHash: text("password_hash"),
+  emailVerified: boolean("email_verified").default(false),
+  lastLoginAt: text("last_login_at"),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpires: text("password_reset_expires"),
+  tier: text("tier").default("Standard"),
+
   // Metadata
   notes: text("notes"),
   sourceSubmissionId: text("source_submission_id"), // first submission that created this dealer
+  source: text("source").default("web_form"),
+  verified: boolean("verified").default(false),
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });

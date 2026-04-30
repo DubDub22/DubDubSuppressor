@@ -8,6 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
+import { registerDealerAuthRoutes } from "./routes/dealer-auth";
 const __dirname = path.dirname(__filename);
 
 /** Cached tax form base64 â€” read once, used everywhere. Reads at call time (not startup) to avoid esbuild scope rename issues. */
@@ -347,6 +348,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register "In The Wild" routes (YouTube + submission system)
   registerWildRoutes(app);
+
+  // Register dealer authentication routes
+  registerDealerAuthRoutes(app);
 
   // Ensure auth tables exist
   await pool.query(`
