@@ -98,15 +98,15 @@ function PendingUpload(props: { fflNumber: string }) {
   const [sotFile, setSotFile] = useState<File | null>(null);
 
   type PendingValues = {
-    dealerName: string;
-    contactName: string;
+    tradeName: string;        // FastBound: business/trade name
+    licenseName: string;      // FastBound: licensee name (contact)
     email: string;
     confirmEmail: string;
     phone: string;
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
+    premiseAddress1: string;
+    premiseCity: string;
+    premiseState: string;
+    premiseZipCode: string;
     fflExpiry: string;
     ein: string;
     einType: string;
@@ -115,15 +115,15 @@ function PendingUpload(props: { fflNumber: string }) {
 
   const form = useForm<PendingValues>({
     defaultValues: {
-      dealerName: "",
-      contactName: "",
+      tradeName: "",
+      licenseName: "",
       email: "",
       confirmEmail: "",
       phone: "",
-      address: "",
-      city: "",
-      state: "",
-      zipCode: "",
+      premiseAddress1: "",
+      premiseCity: "",
+      premiseState: "",
+      premiseZipCode: "",
       fflExpiry: "",
       ein: "",
       einType: "",
@@ -133,15 +133,15 @@ function PendingUpload(props: { fflNumber: string }) {
 
   async function onSubmit(values: PendingValues) {
     // Manual validation
-    if (!values.dealerName || values.dealerName.trim().length < 2) { toast({ title: "Validation", description: "Dealer name must be at least 2 characters", variant: "destructive" }); return; }
-    if (!values.contactName || values.contactName.trim().length < 2) { toast({ title: "Validation", description: "Contact name must be at least 2 characters", variant: "destructive" }); return; }
+    if (!values.tradeName || values.tradeName.trim().length < 2) { toast({ title: "Validation", description: "Trade Name must be at least 2 characters", variant: "destructive" }); return; }
+    if (!values.licenseName || values.licenseName.trim().length < 2) { toast({ title: "Validation", description: "License Name must be at least 2 characters", variant: "destructive" }); return; }
     if (!values.email || !/^[^@]+@[^@]+\.[^@]+$/.test(values.email)) { toast({ title: "Validation", description: "Valid email is required", variant: "destructive" }); return; }
     if (values.email !== values.confirmEmail) { toast({ title: "Validation", description: "Emails do not match", variant: "destructive" }); return; }
     if (!values.phone || values.phone.replace(/\D/g, "").length < 10) { toast({ title: "Validation", description: "Valid phone number is required", variant: "destructive" }); return; }
-    if (!values.address || values.address.trim().length < 5) { toast({ title: "Validation", description: "Address is required", variant: "destructive" }); return; }
-    if (!values.city || values.city.trim().length < 2) { toast({ title: "Validation", description: "City is required", variant: "destructive" }); return; }
-    if (!values.state || values.state.trim().length < 2) { toast({ title: "Validation", description: "State is required", variant: "destructive" }); return; }
-    if (!values.zipCode || values.zipCode.trim().length < 5) { toast({ title: "Validation", description: "ZIP code is required", variant: "destructive" }); return; }
+    if (!values.premiseAddress1 || values.premiseAddress1.trim().length < 5) { toast({ title: "Validation", description: "Premise Address is required", variant: "destructive" }); return; }
+    if (!values.premiseCity || values.premiseCity.trim().length < 2) { toast({ title: "Validation", description: "Premise City is required", variant: "destructive" }); return; }
+    if (!values.premiseState || values.premiseState.trim().length < 2) { toast({ title: "Validation", description: "Premise State is required", variant: "destructive" }); return; }
+    if (!values.premiseZipCode || values.premiseZipCode.trim().length < 5) { toast({ title: "Validation", description: "Premise ZIP code is required", variant: "destructive" }); return; }
     if (!values.fflExpiry || values.fflExpiry.trim().length < 6) { toast({ title: "Validation", description: "FFL Expiration date is required (MM/DD/YYYY)", variant: "destructive" }); return; }
     if (!values.einType) { toast({ title: "Validation", description: "EIN Type is required", variant: "destructive" }); return; }
     if (!values.ein || values.ein.trim().length < 2) { toast({ title: "Validation", description: "EIN is required", variant: "destructive" }); return; }
@@ -179,14 +179,15 @@ function PendingUpload(props: { fflNumber: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fflNumber: fullFfl,
-          dealerName: values.dealerName,
-          contactName: values.contactName,
+          tradeName: values.tradeName,
+          licenseName: values.licenseName,
           email: values.email,
           phone: values.phone,
-          address: values.address,
-          city: values.city,
-          state: values.state,
-          zipCode: values.zipCode,
+          premiseAddress1: values.premiseAddress1,
+          premiseCity: values.premiseCity,
+          premiseState: values.premiseState,
+          premiseZipCode: values.premiseZipCode,
+          premiseCountry: "US",
           fflExpiry: values.fflExpiry,
           einType: values.einType,
           ein: values.ein,
@@ -307,10 +308,10 @@ function PendingUpload(props: { fflNumber: string }) {
 
         <FormField
           control={form.control}
-          name="dealerName"
+          name="tradeName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>FFL / Dealer Name</FormLabel>
+              <FormLabel>FFL / Trade Name</FormLabel>
               <FormControl>
                 <Input {...field} className="bg-card border-border" />
               </FormControl>
@@ -321,10 +322,10 @@ function PendingUpload(props: { fflNumber: string }) {
 
         <FormField
           control={form.control}
-          name="contactName"
+          name="licenseName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Point of Contact</FormLabel>
+              <FormLabel>License Name (Contact)</FormLabel>
               <FormControl>
                 <Input {...field} className="bg-card border-border" />
               </FormControl>
@@ -379,10 +380,10 @@ function PendingUpload(props: { fflNumber: string }) {
 
         <FormField
           control={form.control}
-          name="address"
+          name="premiseAddress1"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Business Address</FormLabel>
+              <FormLabel>Premise Address</FormLabel>
               <FormControl>
                 <Input {...field} className="bg-card border-border" />
               </FormControl>
@@ -394,12 +395,12 @@ function PendingUpload(props: { fflNumber: string }) {
         <div className="grid md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="fflExpiry"
+            name="premiseCity"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>FFL Expiration <span className="text-xs text-muted-foreground font-normal">(MM/DD/YYYY)</span></FormLabel>
+                <FormLabel>Premise City</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="MM/DD/YYYY" className="bg-card border-border" />
+                  <Input {...field} className="bg-card border-border" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -407,21 +408,12 @@ function PendingUpload(props: { fflNumber: string }) {
           />
           <FormField
             control={form.control}
-            name="einType"
+            name="premiseState"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>EIN Type <span className="text-red-400">*</span></FormLabel>
+                <FormLabel>Premise State</FormLabel>
                 <FormControl>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="bg-card border-border">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1 - Importer">Importer</SelectItem>
-                      <SelectItem value="2 - Manufacturer">Manufacturer</SelectItem>
-                      <SelectItem value="3 - Dealer">Dealer</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input {...field} className="bg-card border-border" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -429,13 +421,13 @@ function PendingUpload(props: { fflNumber: string }) {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="city"
+            name="premiseZipCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>City</FormLabel>
+                <FormLabel>Premise ZIP Code</FormLabel>
                 <FormControl>
                   <Input {...field} className="bg-card border-border" />
                 </FormControl>
@@ -445,25 +437,12 @@ function PendingUpload(props: { fflNumber: string }) {
           />
           <FormField
             control={form.control}
-            name="state"
+            name="fflExpiry"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>State</FormLabel>
+                <FormLabel>FFL Expiration <span className="text-xs text-muted-foreground font-normal">(MM/DD/YYYY)</span></FormLabel>
                 <FormControl>
-                  <Input {...field} className="bg-card border-border" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="zipCode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>ZIP Code</FormLabel>
-                <FormControl>
-                  <Input {...field} className="bg-card border-border" />
+                  <Input {...field} placeholder="MM/DD/YYYY" className="bg-card border-border" />
                 </FormControl>
                 <FormMessage />
               </FormItem>

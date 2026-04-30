@@ -1809,7 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ffl/upload", publicFormLimiter, async (req, res) => {
     try {
       const {
-        fflNumber, dealerName, contactName, email, phone, address, city, state, zipCode, fflExpiry, ein, einType, message,
+        fflNumber, tradeName, licenseName, email, phone, premiseAddress1, premiseCity, premiseState, premiseZipCode, fflExpiry, ein, einType, message,
         fflFileName, fflFileData,
         sotFileName, sotFileData,
         taxFormName, taxFormData,
@@ -1873,16 +1873,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update existing record with contact info (file fields left as-is)
         await pool.query(
           `UPDATE dealers SET business_name = COALESCE(NULLIF($1, ''), business_name), contact_name = COALESCE(NULLIF($2, ''), contact_name), email = COALESCE(NULLIF($3, ''), email), phone = COALESCE(NULLIF($4, ''), phone), business_address = COALESCE(NULLIF($5, ''), business_address), city = COALESCE(NULLIF($6, ''), city), state = COALESCE(NULLIF($7, ''), state), zip = COALESCE(NULLIF($8, ''), zip), ein = COALESCE(NULLIF($11, ''), ein), notes = COALESCE(NULLIF($9, ''), notes) WHERE id = $10`,
-          [dealerName, contactName, email, phone, address, city, state, zipCode, message, existing.rows[0].id, ein || null]
+          [tradeName || null, licenseName || null, email, phone, premiseAddress1, premiseCity, premiseState, premiseZipCode, message, existing.rows[0].id, ein || null]
         );
         dealerId = existing.rows[0].id;
       } else {
         // Create a pending dealer entry
         const ins = await pool.query(
           `INSERT INTO dealers (business_name, ffl_license_number, contact_name, email, phone, business_address, city, state, zip, ein, notes, verified, source)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, 'pending_upload')
-           RETURNING id`,
-          [dealerName || `Pending FFL ${normalized}`, normalized, contactName || null, email || null, phone || null, address || null, city || null, state || null, zipCode || null, ein || null, message || null]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, 'pending_upload')
+             RETURNING id`,
+          [tradeName || `Pending FFL ${normalized}`, normalized, licenseName || null, email || null, phone || null, premiseAddress1 || null, premiseCity || null, premiseState || null, premiseZipCode || null, ein || null, message || null]
         );
         dealerId = ins.rows[0].id;
       }
@@ -1892,7 +1892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `INSERT INTO submissions (type, contact_name, business_name, email, phone, ffl_license_number, description, customer_address, customer_city, customer_state, customer_zip, ffl_file_name, ffl_file_data, sot_file_name, sot_file_data, tax_form_name, tax_form_data)
          VALUES ('dealer', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING id`,
-        [contactName || null, dealerName || null, email || null, phone || null, fflNumber, message || null, address || null, city || null, state || null, zipCode || null, fflFileName || null, fflFileData || null, sotFileName || null, sotFileData || null, taxFormName || null, taxFormData || null]
+        [licenseName || null, tradeName || null, email || null, phone || null, fflNumber, message || null, premiseAddress1 || null, premiseCity || null, premiseState || null, premiseZipCode || null, fflFileName || null, fflFileData || null, sotFileName || null, sotFileData || null, taxFormName || null, taxFormData || null]
       );
       // Link it to the dealer
       await pool.query(
