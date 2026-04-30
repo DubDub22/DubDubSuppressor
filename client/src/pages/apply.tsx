@@ -450,6 +450,44 @@ function PendingUpload(props: { fflNumber: string }) {
           />
         </div>
 
+        <div className="grid md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="einType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>EIN Type <span className="text-red-400">*</span></FormLabel>
+                <FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="bg-card border-border">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1 - Importer">Importer</SelectItem>
+                      <SelectItem value="2 - Manufacturer">Manufacturer</SelectItem>
+                      <SelectItem value="3 - Dealer">Dealer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="ein"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>EIN <span className="text-red-400">*</span></FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="XX-XXXXXXX" className="bg-card border-border" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         <FormField
           control={form.control}
           name="message"
