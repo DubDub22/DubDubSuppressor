@@ -107,7 +107,9 @@ function PendingUpload(props: { fflNumber: string }) {
     city: string;
     state: string;
     zipCode: string;
+    fflExpiry: string;
     ein: string;
+    einType: string;
     message: string;
   };
 
@@ -122,7 +124,9 @@ function PendingUpload(props: { fflNumber: string }) {
       city: "",
       state: "",
       zipCode: "",
+      fflExpiry: "",
       ein: "",
+      einType: "",
       message: "",
     },
   });
@@ -138,6 +142,8 @@ function PendingUpload(props: { fflNumber: string }) {
     if (!values.city || values.city.trim().length < 2) { toast({ title: "Validation", description: "City is required", variant: "destructive" }); return; }
     if (!values.state || values.state.trim().length < 2) { toast({ title: "Validation", description: "State is required", variant: "destructive" }); return; }
     if (!values.zipCode || values.zipCode.trim().length < 5) { toast({ title: "Validation", description: "ZIP code is required", variant: "destructive" }); return; }
+    if (!values.fflExpiry || values.fflExpiry.trim().length < 6) { toast({ title: "Validation", description: "FFL Expiration date is required (MM/DD/YYYY)", variant: "destructive" }); return; }
+    if (!values.einType) { toast({ title: "Validation", description: "EIN Type is required", variant: "destructive" }); return; }
     if (!values.ein || values.ein.trim().length < 2) { toast({ title: "Validation", description: "EIN is required", variant: "destructive" }); return; }
 
     const fullFfl = fflSegs.join("-");
@@ -181,6 +187,8 @@ function PendingUpload(props: { fflNumber: string }) {
           city: values.city,
           state: values.state,
           zipCode: values.zipCode,
+          fflExpiry: values.fflExpiry,
+          einType: values.einType,
           ein: values.ein,
           message: values.message || null,
           fflFileName: fflFile.name,
@@ -382,6 +390,44 @@ function PendingUpload(props: { fflNumber: string }) {
             </FormItem>
           )}
         />
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="fflExpiry"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>FFL Expiration <span className="text-xs text-muted-foreground font-normal">(MM/DD/YYYY)</span></FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="MM/DD/YYYY" className="bg-card border-border" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="einType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>EIN Type <span className="text-red-400">*</span></FormLabel>
+                <FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="bg-card border-border">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1 - Importer">Importer</SelectItem>
+                      <SelectItem value="2 - Manufacturer">Manufacturer</SelectItem>
+                      <SelectItem value="3 - Dealer">Dealer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="grid grid-cols-3 gap-4">
           <FormField

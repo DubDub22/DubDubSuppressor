@@ -1809,7 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ffl/upload", publicFormLimiter, async (req, res) => {
     try {
       const {
-        fflNumber, dealerName, contactName, email, phone, address, city, state, zipCode, ein, message,
+        fflNumber, dealerName, contactName, email, phone, address, city, state, zipCode, fflExpiry, ein, einType, message,
         fflFileName, fflFileData,
         sotFileName, sotFileData,
         taxFormName, taxFormData,
