@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
 
-const CSV_PATH = "/home/dubdub/DubDubSuppressor/ffl_master.csv";
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CSV_PATH = path.resolve(__dirname, "..", "ffl_master.csv");
 
 function padLeft(str: string, len: number): string {
   return String(str).padStart(len, "0");

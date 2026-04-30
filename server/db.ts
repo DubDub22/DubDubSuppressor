@@ -1,14 +1,28 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import pkg from "pg";
-const { Pool } = pkg;
 import * as schema from "@shared/schema";
 
-const isProduction = process.env.NODE_ENV === "production";
-const connectionString = process.env.DATABASE_URL;
+const useLocalDb = process.env.LOCAL_DEV === "true";
 
-if (!connectionString) {
+let pool: any;
+let db: any;
+
+if (useLocalDb) {
+  const { newDb } = await import("pg-mem");
+  const mem = newDb();
+  const pg = mem.adapters.createPg();
+  pool = new pg.Pool();
+  db = drizzle(pool as any, { schema });
+} else {
+  const pkg = await import("pg");
+  const { Pool } = pkg;
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
     throw new Error("DATABASE_URL is required in the environment variables");
+  }
+
+  pool = new Pool({ connectionString });
+  db = drizzle(pool, { schema });
 }
 
-export const pool = new Pool({ connectionString });
-export const db = drizzle(pool, { schema });
+export { pool, db };
