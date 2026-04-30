@@ -17,18 +17,18 @@ import { useToast } from "@/hooks/use-toast";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DealerApplyValues {
-  dealerName: string;
-  contactName: string;
+  tradeName: string;
+  licenseName: string;
   email: string;
   confirmEmail: string;
   fflExpiry: string;
   ein: string;
   einType: string;
   contactPhone: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  premiseAddress1: string;
+  premiseCity: string;
+  premiseState: string;
+  premiseZipCode: string;
   message: string;
 }
 
