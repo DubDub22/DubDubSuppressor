@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 import { registerDealerAuthRoutes } from "./routes/dealer-auth";
+import { registerAdminAuthRoutes, requireAdmin as newRequireAdmin } from "./routes/admin-auth";
 const __dirname = path.dirname(__filename);
 
 /** Cached tax form base64 â€” read once, used everywhere. Reads at call time (not startup) to avoid esbuild scope rename issues. */
@@ -352,6 +353,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register dealer authentication routes
   registerDealerAuthRoutes(app);
 
+  // Register admin authentication routes (replaces old PIN/Discord system)
+  registerAdminAuthRoutes(app);
+
   // Ensure auth tables exist
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_pin_requests (
@@ -580,20 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Check if current IP is whitelisted (used on page load)
   app.get("/api/admin/check-auth", async (req, res) => {
-    try {
-      const ip = getClientIp(req);
-      const result = await pool.query(
-        `SELECT expires_at FROM admin_ip_whitelist WHERE ip_address = $1 AND expires_at > NOW()`,
-        [ip]
-      );
-      if (result.rows.length > 0) {
-        (req.session as any).isAdmin = true;
-        return res.json({ ok: true, authorized: true, expiresAt: result.rows[0].expires_at });
-      }
-      return res.json({ ok: true, authorized: false });
-    } catch (err: any) {
-      return res.status(500).json({ ok: false, error: err?.message || "server_error" });
-    }
+    return res.json({ ok: true, authorized: !!req.session?.isAdmin });
   });
 
   app.post("/api/admin/logout", (req, res) => {
@@ -608,6 +599,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     return res.status(403).json({ ok: false, error: "unauthorized" });
   };
+  // Export for backward compatibility
+  app.use((req: any, _res: any, next: any) => { req.requireAdmin = () => requireAdmin; next(); });
 
   app.get("/api/admin/submissions", requireAdmin, async (req, res) => {
     try {

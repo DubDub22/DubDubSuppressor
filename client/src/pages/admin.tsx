@@ -3025,7 +3025,11 @@ function FilesTab() {
 
 export default function AdminPage() {
   const { toast } = useToast();
-  const [authStatus, setAuthStatus] = useState<"checking" | "needs_pin" | "pin_sent" | "authorized">("checking");
+  const [authStatus, setAuthStatus] = useState<"checking" | "needs_login" | "authorized">("checking");
+  const [adminEmail, setAdminEmail] = useState("admin@dubdub22.com");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("submissions");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -3063,7 +3067,7 @@ export default function AdminPage() {
   const [fastBoundLoading, setFastBoundLoading] = useState(false);
   const [form3Loading, setForm3Loading] = useState(false);
 
-  const pinForm = useForm<z.infer<typeof pinSchema>>({ resolver: zodResolver(pinSchema), defaultValues: { pin: "" } });
+  const { toast } = useToast();
 
   const fetchSubmissions = useCallback(async (tabOverride?: string) => {
     const activeTab = tabOverride ?? tab;
@@ -3072,7 +3076,7 @@ export default function AdminPage() {
       // Archives tab always needs archived submissions; submissions tab respects showArchived toggle
       const includeArchived = activeTab === "archives" ? true : showArchived;
       const res = await fetch(`/api/admin/submissions?includeArchived=${includeArchived}&_=${Date.now()}`);
-      if (res.status === 403) { setAuthStatus("needs_pin"); setIsLoading(false); return; }
+      if (res.status === 403) { setAuthStatus("needs_login"); setIsLoading(false); return; }
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       const normalized = Array.isArray(data.data) ? data.data : [];
@@ -3172,39 +3176,44 @@ export default function AdminPage() {
           fetchRetailInquiries();
           setAuthStatus("authorized");
         }
-        else setAuthStatus("needs_pin");
+        else setAuthStatus("needs_login");
       })
-      .catch(() => { if (!cancelled) setAuthStatus("needs_pin"); });
+      .catch(() => { if (!cancelled) setAuthStatus("needs_login"); });
     return () => { cancelled = true; };
   }, [fetchSubmissions, fetchWarrantyRequests, fetchDealerInquiries, fetchRetailInquiries]);
 
-  const onRequestPin = async () => {
+  const onAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminEmail || !adminPassword) { setLoginError("Enter email and password"); return; }
+    setLoginLoading(true);
+    setLoginError("");
     try {
-      const res = await fetch("/api/admin/request-pin", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) { toast({ title: "Request Failed", description: data.error || "Could not request PIN", variant: "destructive" }); return; }
-      toast({ title: "PIN Sent", description: "Check the #general channel on Discord for your PIN." });
-      setAuthStatus("pin_sent");
-    } catch { toast({ title: "Error", description: "Network error", variant: "destructive" }); }
-  };
-
-  const onVerifyPin = async (values: z.infer<typeof pinSchema>) => {
-    try {
-      const res = await fetch("/api/admin/verify-pin", {
+      const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: values.pin }),
+        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
       });
       const data = await res.json();
-      if (!res.ok) { toast({ title: "Invalid PIN", description: data.error || "The PIN was invalid or expired.", variant: "destructive" }); pinForm.reset(); return; }
-      setAuthStatus("authorized");
-      fetchSubmissions();
-    } catch { toast({ title: "Error", description: "Network error", variant: "destructive" }); }
+      if (data.ok) {
+        setAuthStatus("authorized");
+        setAdminPassword("");
+        fetchSubmissions();
+        fetchWarrantyRequests();
+        fetchDealerInquiries();
+        fetchRetailInquiries();
+      } else {
+        setLoginError("Invalid credentials");
+      }
+    } catch {
+      setLoginError("Connection error");
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   const onLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
-    setAuthStatus("needs_pin");
+    setAuthStatus("needs_login");
     setSubmissions([]);
   };
 
@@ -3304,48 +3313,40 @@ export default function AdminPage() {
       <p className="text-muted-foreground">Checking access...</p></div>;
   }
 
-  if (authStatus === "needs_pin" || authStatus === "pin_sent") {
+  if (authStatus === "needs_login") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <Card className="w-full max-w-md bg-card border-border shadow-2xl pt-6">
+        <Card className="w-full max-w-sm bg-card border-border shadow-2xl pt-6">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">🔐 Admin Access</CardTitle>
-            <p className="text-center text-muted-foreground text-sm mt-2">
-              {authStatus === "needs_pin" ? "Request a PIN to access the admin panel."
-                : "Enter the PIN posted in #general on Discord."}
-            </p>
+            <CardTitle className="text-2xl font-bold text-center">Admin Panel</CardTitle>
+            <p className="text-center text-muted-foreground text-sm mt-2">Sign in to manage orders</p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {authStatus === "needs_pin" && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground text-center">
-                  Clicking below will post a 6-digit PIN to the <strong>#general</strong> Discord channel.
-                </p>
-                <Button onClick={onRequestPin} className="w-full text-black bg-primary hover:bg-primary/90">
-                  Request PIN
-                </Button>
+          <CardContent>
+            <form onSubmit={onAdminLogin} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Email</label>
+                <Input
+                  type="email"
+                  value={adminEmail}
+                  onChange={e => setAdminEmail(e.target.value)}
+                  className="bg-background"
+                />
               </div>
-            )}
-            {authStatus === "pin_sent" && (
-              <Form {...pinForm}>
-                <form onSubmit={pinForm.handleSubmit(onVerifyPin)} className="space-y-4">
-                  <FormField control={pinForm.control} name="pin"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>6-Digit PIN</FormLabel>
-                        <FormControl>
-                          <Input inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="123456"
-                            className="text-center text-2xl tracking-widest font-mono bg-background" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  <Button type="submit" className="w-full text-black bg-primary hover:bg-primary/90">Unlock</Button>
-                  <button type="button" onClick={() => setAuthStatus("needs_pin")}
-                    className="w-full text-xs text-muted-foreground hover:text-primary transition-colors">Need a new PIN?</button>
-                </form>
-              </Form>
-            )}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Password</label>
+                <Input
+                  type="password"
+                  value={adminPassword}
+                  onChange={e => setAdminPassword(e.target.value)}
+                  className="bg-background"
+                  autoFocus
+                />
+              </div>
+              {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
+              <Button type="submit" disabled={loginLoading} className="w-full bg-primary hover:bg-primary/90">
+                {loginLoading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
