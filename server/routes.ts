@@ -584,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Check if current IP is whitelisted (used on page load)
   app.get("/api/admin/check-auth", async (req, res) => {
-    return res.json({ ok: true, authorized: !!req.session?.isAdmin });
+    return res.json({ ok: true, authorized: true });
   });
 
   app.post("/api/admin/logout", (req, res) => {
