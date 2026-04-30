@@ -22,14 +22,14 @@ export default function TaxFormPage() {
   const [loading, setLoading] = useState(true);
 
   // Dealer info (auto-filled from API)
-  const [dealerName, setDealerName] = useState("");
-  const [dealerContact, setDealerContact] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [licenseName, setLicenseName] = useState("");
   const [dealerEmail, setDealerEmail] = useState("");
   const [dealerPhone, setDealerPhone] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [customerCity, setCustomerCity] = useState("");
-  const [customerState, setCustomerState] = useState("");
-  const [customerZip, setCustomerZip] = useState("");
+  const [premiseAddress1, setPremiseAddress1] = useState("");
+  const [premiseCity, setPremiseCity] = useState("");
+  const [premiseState, setPremiseState] = useState("");
+  const [premiseZipCode, setPremiseZipCode] = useState("");
   const [stateTaxId, setStateTaxId] = useState("");
 
   const [resaleCertFile, setResaleCertFile] = useState<File | null>(null);
@@ -59,14 +59,14 @@ export default function TaxFormPage() {
         const d = data.data;
 
         // Auto-fill ALL dealer info from database (read-only)
-        setDealerName(d.tradeName || d.businessName || "");
-        setDealerContact(d.licenseName || d.contactName || "");
+        setTradeName(d.tradeName || d.businessName || "");
+        setLicenseName(d.licenseName || d.contactName || "");
         setDealerEmail(d.email || "");
         setDealerPhone(d.phone || "");
-        setCustomerAddress(d.premiseAddress1 || "");
-        setCustomerCity(d.premiseCity || "");
-        setCustomerState(d.premiseState || "");
-        setCustomerZip(d.premiseZipCode || "");
+        setPremiseAddress1(d.premiseAddress1 || "");
+        setPremiseCity(d.premiseCity || "");
+        setPremiseState(d.premiseState || "");
+        setPremiseZipCode(d.premiseZipCode || "");
         setStateTaxId(d.ein || d.stateTaxId || "");
 
         // Check if tax form already on file
@@ -204,14 +204,14 @@ export default function TaxFormPage() {
       // Header
       page.drawText("MULTI-STATE TAX FORM", { x: 50, y: 720, size: 18, font: boldFont, color: rgb(0, 0, 0) });
       page.drawText("Resale Certificate", { x: 50, y: 700, size: 14, font, color: rgb(0, 0, 0) });
-      page.drawText(`State: ${customerState}`, { x: 400, y: 720, size: 12, font, color: rgb(0, 0, 0) });
+      page.drawText(`State: ${premiseState}`, { x: 400, y: 720, size: 12, font, color: rgb(0, 0, 0) });
 
       // Dealer info (auto-filled, read-only)
-      page.drawText(`Dealer: ${dealerName}`, { x: 50, y: 650, size: 12, font, color: rgb(0, 0, 0) });
-      page.drawText(`Contact: ${dealerContact}`, { x: 50, y: 635, size: 12, font, color: rgb(0, 0, 0) });
+      page.drawText(`Dealer: ${tradeName}`, { x: 50, y: 650, size: 12, font, color: rgb(0, 0, 0) });
+      page.drawText(`Contact: ${licenseName}`, { x: 50, y: 635, size: 12, font, color: rgb(0, 0, 0) });
       page.drawText(`Email: ${dealerEmail}`, { x: 50, y: 620, size: 12, font, color: rgb(0, 0, 0) });
       page.drawText(`Phone: ${dealerPhone}`, { x: 50, y: 605, size: 12, font, color: rgb(0, 0, 0) });
-      page.drawText(`Address: ${customerAddress}, ${customerCity}, ${customerState} ${customerZip}`, { x: 50, y: 590, size: 12, font, color: rgb(0, 0, 0) });
+      page.drawText(`Address: ${premiseAddress1}, ${premiseCity}, ${premiseState} ${premiseZipCode}`, { x: 50, y: 590, size: 12, font, color: rgb(0, 0, 0) });
 
       // State Tax ID (on correct line for their state)
       page.drawText(`State Tax ID: ${stateTaxId}`, { x: 50, y: 560, size: 12, font: boldFont, color: rgb(0, 0, 0) });
@@ -244,7 +244,7 @@ export default function TaxFormPage() {
         body: JSON.stringify({
           ffl: ffl,
           taxFormData: pdfBase64,
-          taxFormName: `TaxForm_${dealerName}_${Date.now()}.pdf`,
+          taxFormName: `TaxForm_${tradeName}_${Date.now()}.pdf`,
           stateTaxId: stateTaxId,
           resaleCertData: resaleCertBase64,
           resaleCertName: resaleCertName,
@@ -321,12 +321,12 @@ export default function TaxFormPage() {
                 <Separator className="bg-border" />
 
                 <div className="space-y-2">
-                  <p className="text-sm"><strong>Dealer:</strong> <span className="text-muted-foreground">{dealerName}</span></p>
-                  <p className="text-sm"><strong>Contact:</strong> <span className="text-muted-foreground">{dealerContact}</span></p>
+                  <p className="text-sm"><strong>Dealer:</strong> <span className="text-muted-foreground">{tradeName}</span></p>
+                  <p className="text-sm"><strong>Contact:</strong> <span className="text-muted-foreground">{licenseName}</span></p>
                   <p className="text-sm"><strong>Email:</strong> <span className="text-muted-foreground">{dealerEmail}</span></p>
                   <p className="text-sm"><strong>Phone:</strong> <span className="text-muted-foreground">{dealerPhone}</span></p>
                   <p className="text-sm">
-                    <strong>Address:</strong> <span className="text-muted-foreground">{customerAddress}, {customerCity}, {customerState} {customerZip}</span>
+                    <strong>Address:</strong> <span className="text-muted-foreground">{premiseAddress1}, {premiseCity}, {premiseState} {premiseZipCode}</span>
                   </p>
                 </div>
               </div>
@@ -334,11 +334,11 @@ export default function TaxFormPage() {
               {/* State Tax ID (Editable) */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">
-                  State Tax ID Number ({customerState})
+                  State Tax ID Number ({premiseState})
                 </label>
                 <Input
                   type="text"
-                  placeholder={`Enter ${customerState} Tax ID...`}
+                  placeholder={`Enter ${premiseState} Tax ID...`}
                   value={stateTaxId}
                   onChange={(e) => setStateTaxId(e.target.value)}
                   className="bg-background"

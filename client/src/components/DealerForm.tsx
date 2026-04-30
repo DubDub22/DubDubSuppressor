@@ -147,23 +147,23 @@ export default function DealerForm() {
               ← Change selection
             </button>
 
-            <div className="grid grid-cols-1 gap-4">
-              <FormField control={form.control} name="contactName" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Point of Contact</FormLabel>
-                  <FormControl><Input placeholder="John Doe" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
-                  <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                </FormItem>
-              )} />
+              <div className="grid grid-cols-1 gap-4">
+                <FormField control={form.control} name="licenseName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Point of Contact</FormLabel>
+                    <FormControl><Input placeholder="John Doe" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
+                    <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
+                  </FormItem>
+                )} />
 
-              <FormField control={form.control} name="businessName" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Business Name</FormLabel>
-                  <FormControl><Input placeholder="Tactical Solutions LLC" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
-                  <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
-                </FormItem>
-              )} />
-            </div>
+                <FormField control={form.control} name="tradeName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Business Name</FormLabel>
+                    <FormControl><Input placeholder="Tactical Solutions LLC" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
+                    <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
+                  </FormItem>
+                )} />
+              </div>
 
             <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem>
@@ -213,10 +213,36 @@ export default function DealerForm() {
                 )} />
               </div>
 
-              <FormField control={form.control} name="address" render={({ field }) => (
+              <FormField control={form.control} name="premiseAddress1" render={({ field }) => (
                 <FormItem className="mt-4">
                   <FormLabel>Address</FormLabel>
                   <FormControl><Input placeholder="123 Main St" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
+                  <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
+                </FormItem>
+              )} />
+
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <FormField control={form.control} name="premiseCity" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl><Input placeholder="Houston" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
+                    <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="premiseState" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State</FormLabel>
+                    <FormControl><Input placeholder="TX" {...field} maxLength={2} className="bg-card border-border focus:border-primary uppercase" /></FormControl>
+                    <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={form.control} name="premiseZipCode" render={({ field }) => (
+                <FormItem className="mt-4">
+                  <FormLabel>ZIP Code</FormLabel>
+                  <FormControl><Input placeholder="77541" {...field} className="bg-card border-border focus:border-primary" /></FormControl>
                   <FormMessage className="mt-2 inline-block bg-black/80 text-red-300 px-2 py-1 rounded-md font-semibold border border-red-500/40" />
                 </FormItem>
               )} />
